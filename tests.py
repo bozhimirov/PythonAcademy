@@ -82,13 +82,24 @@
 # #         print(results2)
 # #         # print(results2)
 #
-from datetime import date
+# from datetime import date
+#
+# a = date.today()
+# print(a)
+# b = str(a)
+# c = b.split('-')
+# print(c)
+# print(b)
+# c = date(int(c[0]), int(c[1]), int(c[2]))
+# print(c)
 
-a = date.today()
-print(a)
-b = str(a)
-c = b.split('-')
-print(c)
-print(b)
-c = date(int(c[0]), int(c[1]), int(c[2]))
-print(c)
+
+
+
+from tkinter import *
+
+root = Tk()
+img = PhotoImage(file='images/data.png')
+label = Label(root, image=img)
+label.grid(column=0, row=0)
+root.mainloop()

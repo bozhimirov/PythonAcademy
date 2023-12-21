@@ -8,77 +8,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship,
 # # create an in-memory SQLite database
 # engine = create_engine('sqlite:///mydatabase.db')
 # # engine_in_memory = create_engine('sqlite:///:memory:', echo=True)
-#
-# metadata = MetaData()
-# users_table = Table('users', metadata,
-#                     Column('id', Integer, primary_key=True),
-#                     Column('name', String),
-#                     Column('fullname', String),
-#                     Column('password', String)
-#                     )
-# # create a mapper to map the User class to the users table
-# mapper(User, users_table)
-#
-# # create the users table
-# metadata.create_all(engine)
-#
-# # create a session to manage the connection to the database
-# Session = sessionmaker(bind=engine)
-# session = Session()
-#
-# # add a new user to the database
-# user = User(name='john', fullname='John Doe', password='password')
-# session.add(user)
-# session.commit()
-#
-# # query the users table
-# users = session.query(User).all()
-# print(users)
-#
-# # -----------------------------------------------------------------------------------------------
-# # Create an engine and connect to the database
-# # engine = create_engine('sqlite:///mydatabase.db')
-#
-# # Reflect the existing tables in the database
-# metadata = MetaData()
-# metadata.reflect(bind=engine)
-#
-# # Create a base class for declarative mapping
-# Base = declarative_base()
-#
-#
-# # Define the structure of the table using a mapping class
-# class MyTable(Base):
-#     __tablename__ = 'my_table'
-#     id = Column(Integer, primary_key=True)
-#     name = Column(String)
-#     value = Column(Integer)
-#
-#
-# # Create the table in the database
-# Base.metadata.create_all(engine)
-#
-# # Insert some data into the table
-# engine.execute(MyTable.__table__.insert(), [
-#     {'name': 'foo', 'value': 1},
-#     {'name': 'bar', 'value': 2},
-#     {'name': 'baz', 'value': 3},
-# ])
-#
-# # Create a session to use for querying
-# Session = sessionmaker(bind=engine)
-# session = Session()
-#
-# # Query the database and get an instance of the mapped class
-# instance = session.query(MyTable).first()
-#
-# # Use the inspect function to introspect the instance
-# inspector = inspect(instance)
-#
-# # Print the column names
-# print("Columns:")
-# for column in inspector.attrs:
-#     print(f"{column.key}")
+
 
 class DataBase:
 
@@ -104,13 +34,26 @@ class DataBase:
         else:
             return f'{name}\'s Fridge'
 
-    def make_fridge(self, fridge_name):
-        with Session(engine) as session:
+    @staticmethod
+    def make_fridge(session, fridge_name):
+        # with Session(engine) as session:
+        fridge_obj = session.check_for_fridge(session)
+        if not fridge_obj:
             fridge = Fridge(
-                name=self.check_fridge_name(fridge_name)
+                name=session.check_fridge_name(fridge_name)
             )
             session.add(fridge)
             session.commit()
+
+    @staticmethod
+    def check_for_fridge(session):
+        fridge = select(Fridge).where(Fridge.name != "Change Name")
+        item = []
+        try:
+            item = session.scalars(fridge).one()
+            return item
+        except NoResultFound:
+            return item
 
     @staticmethod
     def get_sub_id(session, sub_name):
@@ -121,6 +64,11 @@ class DataBase:
     @staticmethod
     def add_item_to_fridge(session, new_item):
         session.add(new_item)
+        session.commit()
+
+    @staticmethod
+    def add_recipe_to_fridge(session, new_recipe):
+        session.add(new_recipe)
         session.commit()
 
     @staticmethod
@@ -141,11 +89,27 @@ class DataBase:
             return item
 
     @staticmethod
+    def check_if_recipe_in_fridge(session, new_recipe):
+        try:
+            recipes = select(Recipe).where(Recipe.name == new_recipe.name)
+            recipe = session.scalars(recipes).one()
+            if recipe:
+                n_rec = session.get(Recipe, new_recipe.id)
+                return n_rec
+            else:
+                return []
+
+        except AttributeError:
+            return []
+
+
+
+    @staticmethod
     def set_data_for_item_from_name(session, name_item, new_name, new_amount, new_unit, new_expiry, new_sub):
         items = select(Item).where(Item.name == name_item)
         item = session.scalars(items).one()
         item.name = new_name
-        item.amount = new_amount
+        item.amount = int(new_amount)
         item.unit = new_unit
         item.expiry = new_expiry
         item.sub = new_sub
@@ -174,9 +138,48 @@ class DataBase:
             all_items.append(item)
         return all_items
 
+    @staticmethod
+    def get_all_recipes(session, fridge_id):
+        all_recipes = []
+        recipes = select(Recipe).where(Recipe.fridge_id == fridge_id)
+        for recipe in session.scalars(recipes):
+            all_recipes.append(recipe)
+        return all_recipes
+
+    @staticmethod
+    def get_all_users(session, fridge_id):
+        all_users = []
+        users = select(User).where(User.fridge_id == fridge_id)
+        for user in session.scalars(users):
+            all_users.append(user)
+        return all_users
+
+    @staticmethod
+    def get_all_sub_cat(session):
+        all_sub_cat = session.query(SubCategory).all()
+        return all_sub_cat
+
+    @staticmethod
+    def get_all_main_cat(session):
+        all_main_cat = session.query(MainCategory).all()
+        return all_main_cat
+
 
 class Base(DeclarativeBase):
     pass
+
+class User(Base):
+    __tablename__ = 'users'
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    username: Mapped[str] = mapped_column(String(30))
+    mail: Mapped[str] = mapped_column(String(50))
+
+    fridge_id: Mapped[int] = mapped_column(ForeignKey('fridge.id'))
+    fridge: Mapped['Fridge'] = relationship(back_populates='fridge_users')
+
+    def __repr__(self) -> str:
+        return f'{self.username}'
 
 
 class Fridge(Base):
@@ -188,78 +191,16 @@ class Fridge(Base):
     content: Mapped[List["Item"]] = relationship(
         back_populates='fridge', cascade='all, delete-orphan'
     )
+    favourite_recipes: Mapped[List['Recipe']] = relationship(
+        back_populates='fridge', cascade='all, delete-orphan'
+    )
+
+    fridge_users: Mapped[List['User']] = relationship(
+        back_populates='fridge', cascade='all, delete-orphan'
+    )
 
     def __repr__(self) -> str:
         return f'name={self.name!r}'
-
-    #
-    # def __init__(self, name):
-    #     self.name = f'{name}\'s Fridge'
-    #     self.categories = {}
-    #     if name[-1] == 's':
-    #         self.name = f'{name}\' Fridge'
-    #     for k, v in self.main_categories.items():
-    #         self.categories[k] = {}
-    #         for i in v:
-    #             self.categories[k][i] = []
-    #             # self.categories[k].append(i)
-
-    # def add_item(self, session, item):
-    #     # main_category = item.main_category
-    #     # sub_category = item.sub_category
-    #     # self.categories[main_category][sub_category].append(item)
-    #     content.append(item)
-    # # def __str__(self):
-    # #     return self.name
-    #
-    # def delete_item(self, item):
-    #     for _, v in self.categories.items():
-    #         for _, val in v.items():
-    #             for va in val:
-    #                 if va.name == item.name:
-    #                     val.remove(va)
-    #
-    # def get_data_for_item_from_name(self, name_item):
-    #     item_object = []
-    #     for _, v in self.categories.items():
-    #         for _, val in v.items():
-    #             for va in val:
-    #                 if va.name == name_item:
-    #                     item_object.append(va)
-    #     return item_object
-    #
-    # def set_data_for_item_from_name(self, name_item,
-    #                                 new_name, new_quantity, new_unit, new_expiry, new_main, new_sub):
-    #     for _, v in self.categories.items():
-    #         for _, val in v.items():
-    #             for va in val:
-    #                 if va.name == name_item:
-    #                     va.name = new_name
-    #                     va.quantity = new_quantity
-    #                     va.unit = new_unit
-    #                     va.expiry = new_expiry
-    #                     va.main_category = new_main
-    #                     va.sub_category = new_sub
-    #
-    #
-    # def get_items_by_category(self, category):
-    #     n_l = []
-    #     for k, v in self.categories.items():
-    #         if k == category:
-    #             for _, val in v.items():
-    #                 for va in val:
-    #                     if va:
-    #                         n_l.append(va)
-    #     return n_l
-    #
-    # def get_all_items(self):
-    #     n_l = []
-    #     for _, v in self.categories.items():
-    #         for _, val in v.items():
-    #             for va in val:
-    #                 if va:
-    #                     n_l.append(va)
-    #     return n_l
 
 
 class Ingredient(Base):
@@ -328,8 +269,8 @@ class RecipeSuggestion:
         self.id = rid
         self.title = title
         self.image = image
-        self.used = []
-        self.missed = []
+        self.used = ''
+        self.missed = ''
 
     def __str__(self):
         return self.title
@@ -344,6 +285,9 @@ class Recipe(Base):
     image: Mapped[str] = mapped_column(String(60))
     instructions: Mapped[str] = mapped_column(String(600))
     ingredients: Mapped[List['Ingredient']] = relationship(back_populates='recipe')
+
+    fridge_id: Mapped[int] = mapped_column(ForeignKey('fridge.id'))
+    fridge: Mapped['Fridge'] = relationship(back_populates='favourite_recipes')
 
     def __repr__(self) -> str:
         return f'{self.title}'
