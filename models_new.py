@@ -12,17 +12,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship,
 
 class DataBase:
 
-    CATEGORIES = {
-        'cereals/ cereal products': ['cereals', 'cereal products'],
-        'fruits/ vegetables': ['fruits', 'vegetables'],
-        'meat/ fish': ['meat', 'fish'],
-        'legumes/ nuts/ seeds': ['legumes', 'nuts', 'seeds'],
-        'milk/ eggs/ milk products': ['milk', 'eggs', 'milk products'],
-        'oils/ fats': ['oils', 'fats'],
-        'sweets/ spices': ['sweets', 'spices'],
-        'condiments/ beverages': ['condiments', 'beverages'],
-        'others': ['others']
-    }
+    CATEGORIES = ['fruits', 'vegetables', 'cereals', 'meat', 'fish', 'dairy', 'oils', 'legumes', 'other']
 
     def __init__(self):
         pass
@@ -30,9 +20,9 @@ class DataBase:
     @staticmethod
     def check_fridge_name(name):
         if name[-1] == 's':
-            return f'{name}\' Fridge'
+            return f'{name.capitalize()}\' Fridge'
         else:
-            return f'{name}\'s Fridge'
+            return f'{name.capitalize()}\'s Fridge'
 
     @staticmethod
     def make_fridge(session, fridge_name):
@@ -74,7 +64,6 @@ class DataBase:
     @staticmethod
     def delete_item_from_fridge(session, c_item):
         cc_item = session.get(Item, c_item.id)
-        # print(cc_item)
         session.delete(cc_item)
         session.commit()
 
@@ -91,7 +80,7 @@ class DataBase:
     @staticmethod
     def check_if_recipe_in_fridge(session, new_recipe):
         try:
-            recipes = select(Recipe).where(Recipe.name == new_recipe.name)
+            recipes = select(Recipe).where(Recipe.title == new_recipe.name)
             recipe = session.scalars(recipes).one()
             if recipe:
                 n_rec = session.get(Recipe, new_recipe.id)
@@ -102,33 +91,32 @@ class DataBase:
         except AttributeError:
             return []
 
-
-
     @staticmethod
     def set_data_for_item_from_name(session, name_item, new_name, new_amount, new_unit, new_expiry, new_sub):
         items = select(Item).where(Item.name == name_item)
         item = session.scalars(items).one()
         item.name = new_name
-        item.amount = int(new_amount)
+        item.amount = new_amount
         item.unit = new_unit
         item.expiry = new_expiry
         item.sub = new_sub
-
-    @staticmethod
-    def get_items_by_category(session, category):
-        cats = select(MainCategory).where(MainCategory.name == category)
-        cats = session.scalars(cats).one()
-        cats_id = cats.id
-        print(cats_id)
-        subs = select(SubCategory).where(SubCategory.main_category_id == cats_id)
-        ssubs = session.scalars(subs)
-        print(ssubs)
-        cat_items = []
-        for sub in ssubs:
-            items = select(Item).where(Item.sub_category == sub)
-            for item in session.scalars(items):
-                cat_items.append(item)
-        return cat_items
+        session.commit()
+    #
+    # @staticmethod
+    # def get_items_by_category(session, category):
+    #     cats = select(MainCategory).where(MainCategory.name == category)
+    #     cats = session.scalars(cats).one()
+    #     cats_id = cats.id
+    #     print(cats_id)
+    #     subs = select(SubCategory).where(SubCategory.main_category_id == cats_id)
+    #     ssubs = session.scalars(subs)
+    #     print(ssubs)
+    #     cat_items = []
+    #     for sub in ssubs:
+    #         items = select(Item).where(Item.sub_category == sub)
+    #         for item in session.scalars(items):
+    #             cat_items.append(item)
+    #     return cat_items
 
     @staticmethod
     def get_all_items_from_fridge(session, fridge_id):
@@ -159,14 +147,15 @@ class DataBase:
         all_sub_cat = session.query(SubCategory).all()
         return all_sub_cat
 
-    @staticmethod
-    def get_all_main_cat(session):
-        all_main_cat = session.query(MainCategory).all()
-        return all_main_cat
+    # @staticmethod
+    # def get_all_main_cat(session):
+    #     all_main_cat = session.query(MainCategory).all()
+    #     return all_main_cat
 
 
 class Base(DeclarativeBase):
     pass
+
 
 class User(Base):
     __tablename__ = 'users'
@@ -214,24 +203,16 @@ class Ingredient(Base):
     recipe: Mapped['Recipe'] = relationship(back_populates='ingredients')
 
     def __repr__(self) -> str:
-        return f'{self.name!r}'
-
-    # def __init__(self, name, amount, unit):
-    #     self.name = name
-    #     self.amount = amount
-    #     self.unit = unit
-    #
-    # def __str__(self):
-    #     return self.name
+        return f'{self.name}'
 
 
-class MainCategory(Base):
-    __tablename__ = 'main_category'
-
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    name: Mapped[str]
-    sub_categories: Mapped[List['SubCategory']] = relationship(back_populates='main_category',
-                                                               cascade='all, delete-orphan')
+# class MainCategory(Base):
+#     __tablename__ = 'main_category'
+#
+#     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+#     name: Mapped[str]
+#     sub_categories: Mapped[List['SubCategory']] = relationship(back_populates='main_category',
+#                                                                cascade='all, delete-orphan')
 
 
 class SubCategory(Base):
@@ -239,8 +220,8 @@ class SubCategory(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     name: Mapped[str]
-    main_category_id: Mapped[int] = mapped_column(ForeignKey('main_category.id'))
-    main_category: Mapped["MainCategory"] = relationship(back_populates='sub_categories')
+    # main_category_id: Mapped[int] = mapped_column(ForeignKey('main_category.id'))
+    # main_category: Mapped["MainCategory"] = relationship(back_populates='sub_categories')
     items: Mapped[List['Item']] = relationship(back_populates='sub_category', cascade="all, delete-orphan")
 
     def __repr__(self):
