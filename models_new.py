@@ -68,6 +68,14 @@ class DataBase:
         session.commit()
 
     @staticmethod
+    def delete_zero_amount_item_from_fridge(session, all_items):
+        for a in all_items:
+            if a.amount == '0':
+                cc_item = session.get(Item, a.id)
+                session.delete(cc_item)
+                session.commit()
+
+    @staticmethod
     def get_data_for_item_from_name(session, name_item):
         items = select(Item).where(Item.name == name_item)
         item = []
@@ -80,14 +88,15 @@ class DataBase:
     @staticmethod
     def check_if_recipe_in_fridge(session, new_recipe):
         try:
-            recipes = select(Recipe).where(Recipe.title == new_recipe.name)
+            recipes = select(Recipe).where(Recipe.title == new_recipe.title)
             recipe = session.scalars(recipes).one()
             if recipe:
                 n_rec = session.get(Recipe, new_recipe.id)
                 return n_rec
             else:
                 return []
-
+        except NoResultFound:
+            return []
         except AttributeError:
             return []
 
@@ -101,6 +110,21 @@ class DataBase:
         item.expiry = new_expiry
         item.sub = new_sub
         session.commit()
+
+
+    # @staticmethod
+    # def prepare_data_for_item_from_name(session, name_item, new_name, new_amount, new_unit, new_expiry, new_sub):
+    #     items = select(Item).where(Item.name == name_item)
+    #     item = session.scalars(items).one()
+    #     item.name = new_name
+    #     item.amount = new_amount
+    #     item.unit = new_unit
+    #     item.expiry = new_expiry
+    #     item.sub = new_sub
+    #
+    # @staticmethod
+    # def submit_changes(session):
+    #     session.commit()
     #
     # @staticmethod
     # def get_items_by_category(session, category):
@@ -244,17 +268,17 @@ class Item(Base):
     def __repr__(self) -> str:
         return f'{self.name}'
 
-
-class RecipeSuggestion:
-    def __init__(self, rid, title, image):
-        self.id = rid
-        self.title = title
-        self.image = image
-        self.used = ''
-        self.missed = ''
-
-    def __str__(self):
-        return self.title
+#
+# class RecipeSuggestion:
+#     def __init__(self, rid, title, image):
+#         self.id = rid
+#         self.title = title
+#         self.image = image
+#         self.used = ''
+#         self.missed = ''
+#
+#     def __str__(self):
+#         return self.title
 
 
 class Recipe(Base):
@@ -265,7 +289,7 @@ class Recipe(Base):
     title: Mapped[str] = mapped_column(String(30))
     image: Mapped[str] = mapped_column(String(60))
     instructions: Mapped[str] = mapped_column(String(600))
-    ingredients: Mapped[List['Ingredient']] = relationship(back_populates='recipe')
+    ingredients: Mapped[List['Ingredient']] = relationship(back_populates='recipe', cascade="all,delete",)
 
     fridge_id: Mapped[int] = mapped_column(ForeignKey('fridge.id'))
     fridge: Mapped['Fridge'] = relationship(back_populates='favourite_recipes')

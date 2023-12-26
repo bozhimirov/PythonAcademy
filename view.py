@@ -1,10 +1,13 @@
 import datetime
+import io
 from datetime import date
 
 from tkinter import *
 from tkinter import ttk
+from PIL import Image, ImageTk
+from urllib.request import urlopen, Request
 
-
+from io import BytesIO
 # import tkinter.font as font
 #
 # from dateutil.utils import today
@@ -41,22 +44,23 @@ class View(Tk):
         self.date_val = StringVar()
         self.date_val.set('1')
         self.unit_var = StringVar()
-        self.unit_var.set('count')
+        self.unit_var.set('')
         self._create_main_window()
         self.sub_cat = ''
         self.on_start()
 
     def main(self):
         self.mainloop()
+        pass
 
     # photos = [PhotoImage(file="images/home.png"), PhotoImage(file="images/back.png")]
     def new_date(self, *args):
         if not args:
-            print(self.date_val.get().split(' ')[0])
-            new_date = date.today() + datetime.timedelta(float(str(self.date_val.get()).split(' ')[0]))
+            # print(self.date_val.get().split(' ')[0])
+            new_date = date.today() + datetime.timedelta(int(str(self.date_val.get()).split(' ')[0]))
             var = self.date_view
-            print(new_date)
-            print(type(new_date))
+            # print(new_date)
+            # print(type(new_date))
             var.config(text=str(date.today() + datetime.timedelta(float(str(self.date_val.get()).split(' ')[0]))))
             return str(new_date)
         else:
@@ -235,39 +239,40 @@ class View(Tk):
 
         self.update()
 
-    def chosen_item_str(self, a):
-        if a.widget.curselection() not in [(), '']:
-            sel_item = self.items_list_box.get(a.widget.curselection())
+    def chosen_item_str(self, b):
+        if b.widget.curselection() not in [(), '']:
+            sel_item = self.items_list_box.get(b.widget.curselection())
             if sel_item not in [(), '']:
                 data = self.controller.search_item(sel_item)
-                if data.name not in self.chosen_products:
-                    self.chosen_products.append(data.name)
+                no_digit_name = self.controller.remove_digits(data.name)
+                if no_digit_name not in self.chosen_products:
+                    self.chosen_products.append(no_digit_name)
                 # self.choiceprodvar.set(self.chosen_products)
                 self.set_chosen(self.chosen_products)
-        self.update()
+        # self.update()
 
-    def chosen_product_str(self, a):
-        if a.widget.curselection() not in [(), '']:
-            sel_item = self.items_list_box.get(a.widget.curselection())
-            try:
-                self.chosen_products.remove(sel_item)
-                self.set_chosen(self.chosen_products)
-            except ValueError:
-                self.chosen_products = []
-                self.set_chosen(self.chosen_products)
+    def chosen_product_str(self, c):
+        if c.widget.curselection() not in [(), '']:
+            sel_item = self.items_products_list_box.get(c.widget.curselection())
+            self.chosen_products.remove(sel_item)
+            self.set_chosen(self.chosen_products)
+            # except ValueError:
+            #     self.chosen_products = []
+            #     self.set_chosen(self.chosen_products)
 
     #     # self.update()
 
     def clear_used_missed_instructions(self):
-        self.recipe_ingredients_text['text'] = ''
+        self.recipe_ingredients_text.delete(1.0, 'end')
         # self.recipe_used_text['text'] = ''
         # self.recipe_missed_text['text'] = ''
         self.clear_chosen()
         self.recipe_description_text.delete(1.0, 'end')
 
-    def recipe_find(self, a):
-        if a.widget.curselection() not in [(), '']:
-            recipe_name = self.recipe_list_box.get(a.widget.curselection())
+    def recipe_find(self, d):
+        self.clear_used_missed_instructions()
+        if d.widget.curselection() not in [(), '']:
+            recipe_name = self.recipe_list_box.get(d.widget.curselection())
             # print(recipe_id)
             try:
                 recipe = ''
@@ -280,10 +285,26 @@ class View(Tk):
                     self.controller.chosen_recipe = recipe
                     list_ingredients = []
                     for i in self.controller.chosen_recipe.ingredients:
-                        list_ingredients.append(i.name)
-                    self.recipe_ingredients_text['text'] = ', '.join(list_ingredients)
+                        ingr = self.controller.check_ingredients_not_to_by(i)
 
+                        if ingr and i.name not in list_ingredients:
+                            list_ingredients.append(i.name)
+
+                    res = ', '.join(list_ingredients)
+                    self.recipe_ingredients_text.insert(1.0, res)
                     self.recipe_description_text.delete(1.0, 'end')
+                    if self.controller.chosen_recipe.image:
+                        url = self.controller.chosen_recipe.image
+                        req = Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+                        image_bytes = urlopen(req).read()
+                        data_stream = io.BytesIO(image_bytes)
+                        pil_image = Image.open(data_stream)
+                        global tk_image
+                        tk_image = ImageTk.PhotoImage(pil_image.resize((204, 144)))
+
+                        self.lbl = ttk.Label(self.recipe_image_box, image=tk_image,)
+                        self.lbl.grid(column=0, row=0, sticky='news')
+
                     if self.controller.chosen_recipe.instructions:
                         result = self.controller.remole_li(self.controller.chosen_recipe.instructions)
                         self.recipe_description_text.insert(1.0, result)
@@ -299,8 +320,23 @@ class View(Tk):
                     self.controller.chosen_recipe = recipe
                     list_ingredients = []
                     for i in self.controller.chosen_recipe.ingredients:
-                        list_ingredients.append(i.name)
-                    self.recipe_ingredients_text['text'] = ', '.join(list_ingredients)
+                        for z in self.controller.ingredients_not_to_buy:
+                            if i.name not in z or z not in i.name:
+                                if i.name not in list_ingredients:
+                                    list_ingredients.append(i.name)
+                    res = ', '.join(list_ingredients)
+                    self.recipe_ingredients_text.insert(1.0, res)
+
+                    if self.controller.chosen_recipe.image:
+                        url = self.controller.chosen_recipe.image
+                        req = Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+                        image_bytes = urlopen(req).read()
+                        data_stream = io.BytesIO(image_bytes)
+                        pil_image = Image.open(data_stream)
+                        tk_image = ImageTk.PhotoImage(pil_image.resize((204, 144)))
+
+                        self.lbl = ttk.Label(self.recipe_image_box, image=tk_image, )
+                        self.lbl.grid(column=0, row=0, sticky='news')
 
                     self.recipe_description_text.delete(1.0, 'end')
                     if self.controller.chosen_recipe.instructions:
@@ -318,9 +354,24 @@ class View(Tk):
                     self.controller.chosen_recipe = recipe
                     list_ingredients = []
                     for i in self.controller.chosen_recipe.ingredients:
-                        list_ingredients.append(i.name)
-                    self.recipe_ingredients_text['text'] = ', '.join(list_ingredients)
+                        for z in self.controller.ingredients_not_to_buy:
+                            if i.name not in z or z not in i.name:
+                                if i.name not in list_ingredients:
+                                    list_ingredients.append(i.name)
+                    res = ', '.join(list_ingredients)
+                    self.recipe_ingredients_text.insert(1.0, res)
                     self.recipe_description_text.delete(1.0, 'end')
+
+                    if self.controller.chosen_recipe.image:
+                        url = self.controller.chosen_recipe.image
+                        req = Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+                        image_bytes = urlopen(req).read()
+                        data_stream = io.BytesIO(image_bytes)
+                        pil_image = Image.open(data_stream)
+                        tk_image = ImageTk.PhotoImage(pil_image.resize((204, 144)))
+
+                        self.lbl = ttk.Label(self.recipe_image_box, image=tk_image,)
+                        self.lbl.grid(column=0, row=0, sticky='news')
                     if self.controller.chosen_recipe.instructions:
                         result = self.controller.remole_li(self.controller.chosen_recipe.instructions)
                         self.recipe_description_text.insert(1.0, result)
@@ -343,103 +394,104 @@ class View(Tk):
         cook_chosen_frame.grid(column=0, row=0, sticky='news')
 
         self.make_menu_buttons(cook_chosen_frame, 3)
+        self.listbox_name = ttk.Label(cook_chosen_frame, text='R E C I P E S', font=self.FONT5,
+                                      justify='center')
+        self.listbox_name.grid(column=0, columnspan=3, row=1, sticky='n', pady=0)
+        details_box = Frame(cook_chosen_frame)
+        details_box.grid(column=0, columnspan=3, row=2, sticky='news', padx=6)
         self.choices_products = []
         choicevar = StringVar(self, value=self.choices_products, name='choicev')
-        self.items_list_box = Listbox(cook_chosen_frame, height=5, listvariable=choicevar, selectmode='browse')
-        self.items_list_box.grid(column=0, row=1, sticky='news')
+        self.items_list_box = Listbox(details_box, height=5, width=35, font=self.FONT3, listvariable=choicevar, selectmode='browse')
+        self.items_list_box.grid(column=0, row=0, sticky='news', padx=(0, 6), pady=(0, 6))
         self.items_list_box.bind('<<ListboxSelect>>', self.chosen_item_str)
-        s = ttk.Scrollbar(cook_chosen_frame, orient=VERTICAL, command=self.items_list_box.yview)
-        s.grid(column=0, row=1, sticky='ens')
+        s = ttk.Scrollbar(details_box, orient=VERTICAL, command=self.items_list_box.yview)
+        s.grid(column=0, row=0, sticky='ens', pady=(0, 6), padx=(0, 6))
         self.items_list_box['yscrollcommand'] = s.set
-        details_box = Frame(cook_chosen_frame)
-        details_box.grid(column=1, row=1, sticky='news')
         self.chosen_products = []
         self.choiceprodvar = StringVar(self, value=self.chosen_products, name='choicepv')
-        self.items_products_list_box = Listbox(details_box, height=5, listvariable=self.choiceprodvar,
+        self.details_inner = Frame(details_box)
+        self.details_inner.grid(column=1, row=0, sticky='news', pady=(0, 6), padx=(0, 6))
+        self.items_products_list_box = Listbox(self.details_inner, height=4, font=self.FONT3, listvariable=self.choiceprodvar,
                                                selectmode='browse')
-        self.items_products_list_box.grid(column=0, row=1, sticky='news')
+        self.items_products_list_box.grid(column=0, row=0, sticky='news')
         self.items_products_list_box.bind('<<ListboxSelect>>', self.chosen_product_str)
-        s1 = ttk.Scrollbar(details_box, orient=VERTICAL, command=self.items_products_list_box.yview)
-        s1.grid(column=0, row=1, sticky='ens')
+        s1 = ttk.Scrollbar(self.details_inner, orient=VERTICAL, command=self.items_products_list_box.yview)
+        s1.grid(column=0, row=0, sticky='ens')
         self.items_products_list_box['yscrollcommand'] = s1.set
         # name_label = Listbox(details_box, width=20, height=5)
         # name_label.grid(column=0, row=0, sticky='news')
 
-        buttons_box = Frame(cook_chosen_frame)
-        buttons_box.grid(column=3, row=1, sticky='news')
+        buttons_box = Frame(details_box)
+        buttons_box.grid(column=2, row=0, sticky='e', padx=(0, 6))
+        # sb = ttk.Style()
+        # sb.configure('my.TButton', font=('Helvetica', 12, 'bold'), justify="center",)
         # self.remove_item_btn = ttk.Button(buttons_box, text='remove item',
         #                                   command=self.remove_product)
         # self.remove_item_btn.grid(column=0, row=3, sticky='news')
-        self.clear_list_btn = ttk.Button(details_box, text='clear list',
-                                         command=self.clear_chosen)
-        self.clear_list_btn.grid(column=0, columnspan=2, row=4, sticky='news')
-        self.generate_btn = ttk.Button(buttons_box, text='get recipes',
+        self.clear_list_btn = ttk.Button(self.details_inner, text='CLEAR', style='my.TButton', command=self.clear_chosen)
+        self.clear_list_btn.grid(column=0, row=2, sticky='news', pady=(3, 0))
+        self.generate_btn = ttk.Button(buttons_box, text='GET RECIPES', style='my.TButton',
                                        command=lambda action='generate': self.controller.recipe_action_buttons(action))
-        self.generate_btn.grid(column=0, row=2, sticky='news')
-        self.random_btn = ttk.Button(buttons_box, text='random recipe',
+        self.generate_btn.grid(column=0, row=0, sticky='news', ipady=3, ipadx=4, pady=(0, 3))
+        self.random_btn = ttk.Button(buttons_box, text='RANDOM RECIPES', style='my.TButton',
                                      command=lambda action='random': self.controller.recipe_action_buttons(action))
-        self.random_btn.grid(column=0, row=3, sticky='news')
-        self.favourites_btn = ttk.Button(buttons_box, text='favourite recipes',
+        self.random_btn.grid(column=0, row=1, sticky='news', ipady=4, ipadx=4, pady=(0, 3))
+        self.favourites_btn = ttk.Button(buttons_box, text='FAVOURITE RECIPES', style='my.TButton',
                                          command=lambda action='favourites': self.controller.recipe_action_buttons(
                                              action))
-        self.favourites_btn.grid(column=0, row=4, sticky='news')
-        self.add_to_favourites_btn = ttk.Button(buttons_box, text='add to favourite',
-                                                command=lambda
-                                                    action='add_favourites': self.controller.recipe_action_buttons(
-                                                    action))
-        self.add_to_favourites_btn.grid(column=0, row=5, sticky='news')
-        self.add_to_shopping_btn = ttk.Button(buttons_box, text='add to shopping list',
-                                              command=lambda
-                                                  action='shopping_list': self.controller.recipe_action_buttons(action))
-        self.add_to_shopping_btn.grid(column=0, row=6, sticky='news')
-        self.get_shopping_list_btn = ttk.Button(buttons_box, text='get shopping list',
+        self.favourites_btn.grid(column=0, row=2, sticky='news', ipady=4, ipadx=4)
+        self.get_shopping_list_btn = ttk.Button(buttons_box, text='GET\nSHOPPING\nLIST', style='my.TButton',
                                                 command=lambda
                                                     action='get_shopping_list': self.controller.recipe_action_buttons(
                                                     action))
-        self.get_shopping_list_btn.grid(column=0, row=7, sticky='news')
+        self.get_shopping_list_btn.grid(column=1, row=0, rowspan=3, sticky='nws', padx=(8, 6), ipadx=12)
 
         recipes_box = Frame(cook_chosen_frame)
-        recipes_box.grid(column=0, columnspan=4, row=2, sticky='news')
+        recipes_box.grid(column=0, columnspan=3, row=3, sticky='news', padx=(0, 6))
+        self.add_to_favourites_btn = ttk.Button(recipes_box, text='ADD TO\nFAVOURITES', style='my.TButton',
+                                                command=lambda
+                                                    action='add_favourites': self.controller.recipe_action_buttons(
+                                                    action))
+        self.add_to_favourites_btn.grid(column=1, row=1, sticky='news', padx=(1, 0), ipadx=6, pady=(0, 6),)
         self.recipes_from_chosen_products = []
         self.random_recipes = []
         # self.favourites_recipes = []
         self.shopping_list_l = []
         # choicerecipes = StringVar(self, value=self.controller.db.get_all_recipes(self.controller.session, self.controller.fridge.id), name='choicer')
         choicerecipes = StringVar(self, value=self.recipes_from_chosen_products, name='choicer')
-        self.recipe_list_box = Listbox(recipes_box, height=5, listvariable=choicerecipes, selectmode='browse')
-        self.recipe_list_box.grid(column=0, columnspan=2, row=1, sticky='news')
+        self.recipe_list_box = Listbox(recipes_box, height=4, width=78, font=self.FONT3, listvariable=choicerecipes, selectmode='browse')
+        self.recipe_list_box.grid(column=0, row=1, sticky='news', padx=6, pady=(0, 6), ipadx=6)
         self.recipe_list_box.bind('<<ListboxSelect>>', self.recipe_find)
         sr = ttk.Scrollbar(recipes_box, orient=VERTICAL, command=self.recipe_list_box.yview)
-        sr.grid(column=2, row=1, sticky='ens')
+        sr.grid(column=0, row=1, sticky='ens', pady=(0, 6))
         self.recipe_list_box['yscrollcommand'] = sr.set
+        self.recipe_ingredients_box = Frame(recipes_box)
+        self.recipe_ingredients_box.grid(column=0, columnspan=4, row=3, sticky='news', padx=6, pady=(0, 6))
+        self.recipe_ingredients_label = ttk.Label(self.recipe_ingredients_box, font=self.FONT3, text='INGREDIENTS:', width=14)
+        self.recipe_ingredients_label.grid(column=0, row=0, sticky='nw')
+        self.recipe_ingredients_text = Text(self.recipe_ingredients_box, font=self.FONT3, width=62, height=2, wrap='word')
+        self.recipe_ingredients_text.grid(column=1, row=0, sticky='news', padx=(2, 2), ipadx=7)
+        sri = ttk.Scrollbar(self.recipe_ingredients_box, orient=VERTICAL, command=self.recipe_ingredients_text.yview)
+        sri.grid(column=2, row=0, sticky='ens')
+        self.recipe_ingredients_text['yscrollcommand'] = sri.set
+
+        self.add_to_shopping_btn = ttk.Button(self.recipe_ingredients_box, text='ADD TO\nSHOPPING LIST', style='my.TButton',
+                                              command=lambda
+                                                  action='shopping_list': self.controller.recipe_action_buttons(action))
+        self.add_to_shopping_btn.grid(column=3, row=0, sticky='news', padx=(3, 0))
+
         recipe_details_box = Frame(recipes_box)
-        recipe_details_box.grid(column=0, columnspan=2, row=3, sticky='news')
-        # self.recipe_title_label = ttk.Label(recipe_details_box, text='title:')
-        # self.recipe_title_label.grid(column=0, row=0, sticky='w')
-        # self.recipe_title_text = ttk.Label(recipe_details_box, text='')
-        # self.recipe_title_text.grid(column=1, row=0, sticky='news')
-        self.recipe_ingredients_box = Frame(recipe_details_box)
-        self.recipe_ingredients_box.grid(column=0, columnspan=3, row=0, sticky='news')
-        self.recipe_ingredients_label = ttk.Label(self.recipe_ingredients_box, text='ingredients:', width=14)
-        self.recipe_ingredients_label.grid(column=0, row=0, sticky='w')
-        self.recipe_ingredients_text = ttk.Label(self.recipe_ingredients_box, text='here should be places ingredients separated with commas', width=60)
-        self.recipe_ingredients_text.grid(column=1, row=0, sticky='news')
-        # self.recipe_used_box = Frame(recipe_details_box)
-        # self.recipe_used_box.grid(column=0, columnspan=3, row=0, sticky='news')
-        # self.recipe_used_label = ttk.Label(self.recipe_used_box, text='used:', width=7)
-        # self.recipe_used_label.grid(column=0, row=0, sticky='w')
-        # self.recipe_used_text = ttk.Label(self.recipe_used_box, text='', width=60)
-        # self.recipe_used_text.grid(column=1, row=0, sticky='w')
-        # self.recipe_missed_box = Frame(recipe_details_box)
-        # self.recipe_missed_box.grid(column=0, columnspan=3, row=1, sticky='news')
-        # self.recipe_missed_label = ttk.Label(self.recipe_missed_box, text='missed:', width=7)
-        # self.recipe_missed_label.grid(column=0, row=0, sticky='w')
-        # self.recipe_missed_text = ttk.Label(self.recipe_missed_box, text='', width=60)
-        # self.recipe_missed_text.grid(column=1, row=0, sticky='w')
-        # self.recipe_description_label = ttk.Label(recipe_details_box, text='description:')
-        # self.recipe_description_label.grid(column=0, row=3, sticky='w')
-        self.recipe_description_text = Text(recipe_details_box, width=60, height=7, wrap='word')
-        self.recipe_description_text.grid(column=0, row=2, sticky='news')
+        recipe_details_box.grid(column=0, columnspan=4, row=4, sticky='news', padx=6, pady=(0, 6))
+        self.recipe_image_box = Frame(recipe_details_box)
+        self.recipe_image_box.grid(column=2, row=2, sticky='news')
+        # global ni
+        global img
+        # ni = PhotoImage(file='images/jb-no-photo__24078.jpg')
+        img = ImageTk.PhotoImage(Image.open('images/jb-no-photo__24078.jpg'))
+        self.lbl = Label(self.recipe_image_box, image=img, width=204, height=144)
+        self.lbl.grid(column=0, row=0, sticky='news', padx=(4, 0))
+        self.recipe_description_text = Text(recipe_details_box, font=self.FONT3, width=65, height=8, wrap='word')
+        self.recipe_description_text.grid(column=0, row=2, sticky='news', ipadx=22)
         srr = ttk.Scrollbar(recipe_details_box, orient=VERTICAL, command=self.recipe_description_text.yview)
         srr.grid(column=1, row=2, sticky='ens')
         self.recipe_description_text['yscrollcommand'] = srr.set
@@ -449,31 +501,46 @@ class View(Tk):
     def make_qr_shopping_list_window(self, parent):
         shopping_list_frame = Frame(parent, name="shopping list")
         shopping_list_frame.grid(column=0, row=0, sticky='news')
+
+        shopping_list_frame.columnconfigure(0, weight=1)
+        shopping_list_frame.rowconfigure(0, weight=1)
         try:
             nm = self.sub_cat
         except AttributeError:
             nm = ''
         self.make_menu_buttons(shopping_list_frame, 2, nm)
         self.left_box = Frame(shopping_list_frame)
-        self.left_box.grid(column=0, row=1, sticky='news')
+        self.left_box.grid(column=0, columnspan=2, row=1, sticky='news', padx=(6, 0), pady=(0, 6))
+        self.left_box.columnconfigure(0, weight=1)
+        self.left_box.rowconfigure(0, minsize=420, weight=1)
         self.inner_left_box = Frame(self.left_box)
         self.inner_left_box.grid(column=0, row=0, sticky='news')
         self.right_box = Frame(shopping_list_frame, background='gray')
-        self.right_box.grid(column=1, row=1, sticky='news')
-        img = PhotoImage(file='data.gif')
-        self.label_qr = Label(self.right_box, image=img)
-        self.label_qr.grid(column=0, columnspan=2, row=0)
-        self.clear_shopping_list_btn = Button(self.right_box, text='Clear Shopping List',
+        self.right_box.grid(column=2, row=1, sticky='news', padx=(0, 6), pady=(0, 6))
+        self.right_box.columnconfigure(0, weight=1)
+        self.right_box.rowconfigure(0, weight=1)
+        global imge
+        imge = PhotoImage(file='data.gif')
+        self.label_qr = Label(self.right_box, image=imge)
+        self.label_qr.grid(column=0, columnspan=2, row=0, sticky='s')
+        # sq = ttk.Style()
+        # sq.configure('my.TButton', font=('Helvetica', 14, 'bold'), justify="center", )
+
+        self.clear_shopping_list_btn = ttk.Button(self.right_box, text='Clear\nShopping List', style='my.TButton',
                                               command=self.controller.clear_shopping_list)
-        self.clear_shopping_list_btn.grid(column=0, row=1)
-        self.continue_shopping_btn = Button(self.right_box, text='Continue Shopping', command=self.fall_back_under)
-        self.continue_shopping_btn.grid(column=1, row=1)
-        self.remove_from_fridge_cook_btn = Button(self.right_box, text='COOK',
+        self.clear_shopping_list_btn.grid(column=0, row=1, ipadx=12, padx=(0, 6), pady=(6))
+        self.continue_shopping_btn = ttk.Button(self.right_box, text='Continue\nShopping', style='my.TButton',
+                                            command=self.fall_back_under)
+        self.continue_shopping_btn.grid(column=1, row=1, ipadx=12)
+        self.remove_from_fridge_cook_btn = ttk.Button(self.right_box, text='COOK', style='my.TButton',
                                                   command=self.controller.remove_from_fridge_if_any)
-        self.remove_from_fridge_cook_btn.grid(column=0, columnspan=2, row=2, sticky='news')
-        self.shopping_list_lable = ttk.Label(self.inner_left_box, text='Shopping List', font=('bold', 16),
+        self.remove_from_fridge_cook_btn.grid(column=0, columnspan=2, row=2, sticky='news', ipady=52)
+        self.shopping_list_title = ttk.Label(self.left_box, text='SHOPPING LIST', font=self.FONT4,
+                                             justify='center', background='gray')
+        self.shopping_list_title.grid(column=0, columnspan=2, row=0, sticky='n', pady=(0, 12))
+        self.shopping_list_lable = ttk.Label(self.inner_left_box, font=self.FONT4,
                                              justify='center')
-        self.shopping_list_lable.grid(column=0, row=0, sticky='news')
+        self.shopping_list_lable.grid(column=0, row=0, sticky='n', pady=(0, 12))
         self.shopping = []
         # self.choiceshopvar = StringVar(self, value=self.shopping, name='choicsev')
         # self.shopping_list_content = Text(self.inner_left_box, height=4, font=('bold', 10))
@@ -481,30 +548,26 @@ class View(Tk):
         # sss = ttk.Scrollbar(self.inner_left_box, orient=VERTICAL, command=self.shopping_list_content.yview)
         # sss.grid(column=0, row=1, sticky='ens')
         # self.shopping_list_content['yscrollcommand'] = sss.set
-        self.shopping_list_content = ttk.Label(self.inner_left_box, font=('bold', 10))
-        self.shopping_list_content.grid(column=0, row=1, sticky='news')
-        self.mail_box_l = ttk.Frame(self.inner_left_box)
-        self.mail_box_l.grid(column=0, row=2, sticky='news')
+        self.shopping_list_content = ttk.Label(self.inner_left_box, font=('bold', 14))
+        self.shopping_list_content.grid(column=0, row=1, sticky='news', padx=(28, 18))
+        self.shopping_list_content2 = ttk.Label(self.inner_left_box, font=('bold', 14))
+        self.shopping_list_content2.grid(column=2, row=1, sticky='news', padx=18)
+        # self.mail_box_l = ttk.Frame(self.left_box)
+        # self.mail_box_l.grid(column=0, row=2, sticky='news')
         users = self.controller.db.get_all_users(self.controller.session, self.controller.fridge.id)
-        self.send_btn_box = ttk.Label(self.mail_box_l)
-        self.send_btn_box.grid(column=0, row=0, sticky='news')
+        self.send_btn_box = ttk.Label(self.left_box, justify='center')
+        self.send_btn_box.grid(column=0, columnspan=2, row=2, sticky='s')
         counter = 0
         for user in users:
-            btn = ttk.Button(self.send_btn_box, text=f'Send to {user.username}',
+            btn = ttk.Button(self.send_btn_box, text=f'Send to {user.username}', style='my.TButton',
                              command=lambda mail=user.mail: self.controller.send_mail(mail))
-            btn.grid(column=counter, row=0)
+            btn.grid(column=counter, row=0, padx=(0, 18))
             counter += 1
 
-        self.mail_box_r = ttk.Frame(self.send_btn_box)
-        self.mail_box_r.grid(column=0, row=1, sticky='news')
-        self.mail_label_r = ttk.Label(self.mail_box_r, text='Send mail to: ')
-        self.mail_label_r.grid(column=0, row=0, sticky='news')
 
-        self.mail_entry_r = ttk.Entry(self.mail_box_r)
-        self.mail_entry_r.grid(column=1, row=0, sticky='news')
-        self.mail_btn_r = ttk.Button(self.mail_box_r, text='Send', command=self.controller.send_mail)
-        self.mail_btn_r.grid(column=2, columnspan=2, row=0, sticky='news')
-
+        self.mail_btn_r = ttk.Button(self.send_btn_box, text='Send to', style='my.TButton',
+                                     command=lambda x='': self.controller.send_mail(x))
+        self.mail_btn_r.grid(column=counter, row=0)
         return shopping_list_frame
 
     def make_cook_window(self, parent):
@@ -526,8 +589,8 @@ class View(Tk):
         return cook_frame
 
     def make_add_item_window(self, parent):
-        st = ttk.Style()
-        st.configure('my.TButton', font=('bold', 14))
+        # st = ttk.Style()
+        # st.configure('my.TButton', font=('bold', 14))
 
         add_item_frame = Frame(parent, name="add items")
         add_item_frame.grid(column=0, row=0, sticky='news')
@@ -540,16 +603,16 @@ class View(Tk):
         self.make_menu_buttons(add_item_frame, 3, nm)
         self.choices = []
         self.under_menu_frame = Frame(add_item_frame)
-        self.under_menu_frame.grid(column=0, columnspan=3, row=1, sticky='news')
+        self.under_menu_frame.grid(column=0, columnspan=3, row=1, sticky='news', padx=6)
         self.under_menu_frame.columnconfigure(0, weight=1)
         self.under_menu_frame.rowconfigure(0, weight=1)
         choicevar = StringVar(self, value=self.choices, name='choicev', )
         self.listbox_name = ttk.Label(self.under_menu_frame, text='PRODUCTS IN FRIDGE', font=self.FONT5,
                                       justify='center')
-        self.listbox_name.grid(column=0, columnspan=4, row=1, sticky='n', pady=(0, 18))
+        self.listbox_name.grid(column=0, columnspan=4, row=1, sticky='n', pady=(0, 38))
         self.items_list_box = Listbox(self.under_menu_frame, height=15, listvariable=choicevar, selectmode='browse',
                                       width=37, font=self.FONT5)
-        self.items_list_box.grid(column=0, row=2, sticky='e', padx=(1, 0), pady=(0, 12))
+        self.items_list_box.grid(column=0, row=2, sticky='e', padx=(4, 0), pady=(0, 12))
         self.items_list_box.bind('<<ListboxSelect>>', self.selected_item_str)
 
         s = ttk.Scrollbar(self.under_menu_frame, orient=VERTICAL, command=self.items_list_box.yview)
@@ -567,7 +630,7 @@ class View(Tk):
         date_entry = ttk.Spinbox(details_box, from_=1, to=365, textvariable=self.date_val, command=self.new_date,
                                  width=5, font=self.FONT3)
 
-        date_entry.grid(column=1, row=1, sticky='e')
+        date_entry.grid(column=1, row=1, sticky='e', padx=(0, 7))
         self.date_view = ttk.Label(details_box, text='', width=26, background='white', borderwidth=1, relief="groove", font=self.FONT3)
         self.date_view.grid(column=1, row=1, sticky='w', ipady=1)
         name_label = ttk.Label(details_box, text='Name:', font=self.FONT3, width=12)
@@ -578,7 +641,7 @@ class View(Tk):
         q_box.grid(column=1, row=2, sticky='news')
         quantity_label = ttk.Label(details_box, text='Quantity:', font=self.FONT3)
         quantity_label.grid(column=0, row=2, sticky='w')
-        self.quantity_entry = ttk.Spinbox(q_box, from_=1, to=10000, increment=1, textvariable=self.quantity_val, width=17, font=self.FONT3)
+        self.quantity_entry = ttk.Spinbox(q_box, from_=1, to=10000, increment=1, textvariable=self.quantity_val, width=17, font=self.FONT3, state='disabled')
         self.quantity_entry.grid(column=0, row=0, sticky='w', padx=(0, 1))
 
         self.units_entry = ttk.Combobox(q_box, textvariable=self.unit_var, width=6, font=self.FONT3)
@@ -590,18 +653,31 @@ class View(Tk):
         self.clear_btn.grid(column=2, row=0, rowspan=3, sticky='nws', ipadx=4, padx=(6, 6))
         buttons_box = Frame(details_box)
         buttons_box.grid(column=0, columnspan=4, row=4, sticky='n')
-        self.add_btn = Button(buttons_box, text='ADD', font="Helvetica 12 bold", width=19,
+        self.add_btn = Button(buttons_box, text='ADD', font="Helvetica 12 bold", width=12,
+        # self.add_btn = Button(buttons_box, text='ADD', font="Helvetica 12 bold", width=19,
                                   command=lambda action='add': self.controller.item_action_buttons(action))
         self.add_btn.grid(column=0, row=0, sticky='we', padx=(0, 6), pady=(6, 6), ipadx=2, ipady=6)
-        self.update_btn = Button(buttons_box, text='UPDATE', width=19, font="Helvetica 12 bold",
+        self.update_btn = Button(buttons_box, text='UPDATE', width=12, font="Helvetica 12 bold",
+        # self.update_btn = Button(buttons_box, text='UPDATE', width=19, font="Helvetica 12 bold",
                                      command=lambda action='update': self.controller.item_action_buttons(action))
         self.update_btn.grid(column=1, row=0, sticky='we',  padx=(0, 6), ipadx=2, ipady=6)
-        self.remove_btn = Button(buttons_box, text='REMOVE', width=19, font="Helvetica 12 bold",
-                                     command=lambda action='remove': self.controller.item_action_buttons(action))
-        self.remove_btn.grid(column=0, row=1, sticky='ew', padx=(0, 6), pady=(6, 6), ipadx=2, ipady=6)
-        self.del_btn = Button(buttons_box, text='DELETE', width=19, font="Helvetica 12 bold",
+        # self.remove_btn = Button(buttons_box, text='REMOVE', width=19, font="Helvetica 12 bold",
+        #                              command=lambda action='remove': self.controller.item_action_buttons(action))
+        # self.remove_btn.grid(column=0, row=1, sticky='ew', padx=(0, 6), pady=(6, 6), ipadx=2, ipady=6)
+        self.del_btn = Button(buttons_box, text='DELETE', width=12, font="Helvetica 12 bold",
+        # self.del_btn = Button(buttons_box, text='DELETE', width=19, font="Helvetica 12 bold",
                                   command=lambda action='delete': self.controller.item_action_buttons(action))
-        self.del_btn.grid(column=1, row=1, sticky='we',  padx=(0, 6), ipadx=2, ipady=6)
+        self.del_btn.grid(column=2, row=0, sticky='we',  padx=(0, 6), ipadx=2, ipady=6)
+        # self.del_btn.grid(column=1, row=1, sticky='we',  padx=(0, 6), ipadx=2, ipady=6)
+
+        self.keyboard_box = Frame(details_box)
+        self.keyboard_box.grid(column=0, columnspan=4, row=5, sticky='n')
+        num_buttons = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '.', 'enter']
+        name_buttons = ['q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p', 'a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', 'z', 'x', 'c', 'v', 'b', 'n', 'm', 'space', 'enter']
+        self.alpha_box = Frame(self.keyboard_box)
+        self.controller.make_letter_buttons(self.alpha_box)
+        self.alpha_box.grid(column=0, row=0, sticky='s', pady=(32, 0))
+
         return add_item_frame
 
     # def make_condiments_beverages_window(self, parent):
@@ -801,14 +877,15 @@ class View(Tk):
     def display_expired_for_deleting(self):
         ex_pr = [x.name for x in self.controller.expired_products]
         expired = '\n'.join(ex_pr)
-        self.pop_expired = Button(self.ask, text=f'Expired items:\n{expired}', command=self.controller.delete_expired)
-        self.pop_expired_label = Label(self.ask, text='Click to delete', font=('bold', 10))
-        self.pop_expired.grid(column=0, columnspan=2, row=1, sticky='news')
-        self.pop_expired_label.grid(column=0, columnspan=2, row=0, sticky='news')
+        # se = ttk.Style()
+        # se.configure('my.TButton', font=('Times', 26, 'bold', 'italic'), justify="center")
+        self.pop_expired = ttk.Button(self.ask, text=f'EXPIRED ITEMS:\n\n\n\n{expired}\n\n\n\n\nClick to DELETE from list\n\nremove from fridge', command=self.controller.delete_expired,
+                                      style='my.TButton')
+        self.pop_expired.grid(column=0, columnspan=2, row=0, sticky='news', ipady=220)
 
     def make_initial_window(self, parent):
         s = ttk.Style()
-        s.configure('my.TButton', font=('Helvetica', 12))
+        s.configure('my.TButton', font=('Helvetica', 12, 'bold'), justify="center",)
         if self.controller.fridge.name == 'Change name':
             self.initial_frame = ttk.Frame(self.root)
             self.initial_frame.columnconfigure(0, weight=1)
@@ -863,6 +940,9 @@ class View(Tk):
             self.submit_fridge_data_btn = ttk.Button(self.initial_box, text='Submit', style='my.TButton',
                                                      command=self.controller.initial_data)
             self.submit_fridge_data_btn.grid(column=1, columnspan=3, row=10, pady=10, sticky='ew')
+            self.invalid_name_message = ttk.Label(self.initial_box, text='Invalid name', justify='center', foreground='red', font=('Times', 14, 'bold'))
+            self.invalid_username_message = ttk.Label(self.initial_box, text='No username', justify='center', foreground='red', font=('Times', 14, 'bold'))
+            self.invalid_mail_message = ttk.Label(self.initial_box, text='Invalid email', justify='center', foreground='red', font=('Times', 14, 'bold'))
             return self.initial_frame
         else:
             return self.on_start()
@@ -953,6 +1033,7 @@ class View(Tk):
             self.set_recipes([])
             self.random_recipes = []
         self.middle_menu_label.config(text=self.sub_cat)
+        self.set_values()
 
     def fall_back_under(self):
         if len(self.frame_stack) > 1:
@@ -966,7 +1047,11 @@ class View(Tk):
             self.date_view['text'] = self.new_date()
             self.name_entry.delete(0, END)
             self.name_entry.insert(0, '')
-            self.unit_var.set('count')
+            self.units_entry['values'] = ('count', 'ml', 'l', 'g', 'kg')
+            self.unit_var.set('')
+            self.units_entry.set('')
+            self.name_entry.focus()
+            self.quantity_entry['state'] = 'disabled'
         else:
             data = args[0]
             self.unit_var.set(data.unit)
@@ -983,8 +1068,11 @@ class View(Tk):
         unit = self.unit_var.get()
         expiry_date = self.new_date()
         sub_category = self.sub_cat
-        n_quantity, n_unit = self.controller.make_unit(quantity, unit)
-        return name_item, n_quantity, n_unit, expiry_date, sub_category
+        if unit and quantity:
+            n_quantity, n_unit = self.controller.make_unit(quantity, unit)
+            return name_item, n_quantity, n_unit, expiry_date, sub_category
+        else:
+            return name_item, quantity, unit, expiry_date, sub_category
 
     def enable_buttons(self):
         self.add_btn['state'] = 'normal'

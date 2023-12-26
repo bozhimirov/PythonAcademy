@@ -1,3 +1,4 @@
+import string
 import time
 from datetime import date, datetime, timedelta
 
@@ -5,6 +6,8 @@ import PIL
 from PIL import ImageTk, Image
 
 import segno
+from validate_email import validate_email
+# from pydantic import validate_email
 from segno import helpers
 from PIL import ImageTk, Image
 
@@ -20,12 +23,15 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 from master_project.view import View
-from models_new import DataBase, Item, RecipeSuggestion, Ingredient, Recipe, Base, Fridge, User, SubCategory
+from models_new import DataBase, Item, Ingredient, Recipe, Base, Fridge, User, SubCategory
 
 
 class Controller:
     api_keys = ['apiKey=69f4da8ccbdd4431954fdc77a282b0cf', 'apiKey=c0a99b232eb44675a3f26b0945867318',
-                     'apiKey=532e06fb4a034e55aa0a28d915c8ab4b', 'apiKey=4bb99921a1fa470bb800293b23863d29']
+                'apiKey=532e06fb4a034e55aa0a28d915c8ab4b', 'apiKey=4bb99921a1fa470bb800293b23863d29']
+
+    ingredients_not_to_buy = ['water', 'salt', 'table salt', 'salt and pepper', 'flour', 'half and half',
+                              'pepper', 'sugar']
 
     def __init__(self):
         self.engine = create_engine('sqlite:///mydatabase.db')
@@ -49,7 +55,6 @@ class Controller:
         # self.recipes = self.get_recipes_by_items()
         # self.get_recipe_by_id(self.recipes[1])
         self.chosen_recipe = object
-
 
     def check_for_expired_products(self):
         items = self.db.get_all_items_from_fridge(self.session, self.fridge.id)
@@ -89,7 +94,8 @@ class Controller:
             print(response)
 
     def get_random_recipes(self):
-        self.api_keys = ['apiKey=69f4da8ccbdd4431954fdc77a282b0cf', 'apiKey=c0a99b232eb44675a3f26b0945867318', 'apiKey=532e06fb4a034e55aa0a28d915c8ab4b', 'apiKey=4bb99921a1fa470bb800293b23863d29']
+        self.api_keys = ['apiKey=69f4da8ccbdd4431954fdc77a282b0cf', 'apiKey=c0a99b232eb44675a3f26b0945867318',
+                         'apiKey=532e06fb4a034e55aa0a28d915c8ab4b', 'apiKey=4bb99921a1fa470bb800293b23863d29']
 
         random_url = f'https://api.spoonacular.com/recipes/random?number=5&{self.api_keys[1]}&tags="main course"'
         response = requests.get(random_url)
@@ -114,10 +120,17 @@ class Controller:
                 recipe = Recipe(
                     recipe_id=rr_id, title=r_name, image=r_image, instructions=r_instructions)
                 for i in r_ingredients:
-                    amount, unit = self.make_unit(i['measures']['metric']['amount'], i['measures']['metric']['unitShort'])
+                    amount, unit = self.make_unit(i['measures']['metric']['amount'],
+                                                  i['measures']['metric']['unitShort'])
+                    ingr_name = i['name']
+                    if i['nameClean']:
+                        ingr_name = self.check_name_len(i['name'], i['nameClean'])
                     ingredient = Ingredient(
-                        name=i['name'], amount=amount, unit=unit)
-                    recipe.ingredients.append(ingredient)
+                        name=ingr_name, amount=amount, unit=unit)
+                    for i in self.ingredients_not_to_buy:
+                        if ingredient.name not in i or i not in ingredient.name:
+                            if ingredient not in recipe.ingredients:
+                                recipe.ingredients.append(ingredient)
                 recipes.append(recipe)
             return recipes
 
@@ -130,8 +143,6 @@ class Controller:
             for fr in self.db.check_if_recipe_in_fridge(self.session, name):
                 if fr.title == name:
                     return fr
-
-
 
     def get_bulk_recipes_by_ids(self, ids):
         ids = [str(x) for x in ids]
@@ -153,14 +164,24 @@ class Controller:
             # r_analyzedInstructions = results['analyzedInstructions']
             # steps = r_analyzedInstructions[0]["steps"]
             recipe = Recipe(
-                recipe_id=rr_id, title=r_name, image=r_image, instructions=r_instructions)
+                recipe_id=rr_id, title=r_name, image=r_image, instructions=self.remole_li(r_instructions))
             for i in r_ingredients:
                 amount, unit = self.make_unit(i['measures']['metric']['amount'], i['measures']['metric']['unitShort'])
+                ingr_name = self.check_name_len(i['name'], i['nameClean'])
                 ingredient = Ingredient(
-                    name=i['name'], amount=amount, unit=unit)
-                recipe.ingredients.append(ingredient)
+                    name=ingr_name, amount=amount, unit=unit)
+                for i in self.ingredients_not_to_buy:
+                    if ingredient.name not in i or i not in ingredient.name:
+                        if ingredient not in recipe.ingredients:
+                            recipe.ingredients.append(ingredient)
             recipes.append(recipe)
         return recipes
+
+    def check_ingredients_not_to_by(self, ingredient):
+        for i in self.ingredients_not_to_buy:
+            if i in ingredient.name or ingredient.name in i:
+                return ''
+        return ingredient
 
     def get_recipe_by_id(self, recipe):
         recipe_id = ''
@@ -191,8 +212,11 @@ class Controller:
             amount, unit = self.make_unit(i['measures']['metric']['amount'], i['measures']['metric']['unitShort'])
             ingr_name = self.check_name_len(i['name'], i['nameClean'])
             ingredient = Ingredient(
-                name=i['name'], amount=amount, unit=unit)
-            recipe.ingredients.append(ingredient)
+                name=ingr_name, amount=amount, unit=unit)
+            for i in self.ingredients_not_to_buy:
+                if ingredient.name not in i or i not in ingredient.name:
+                    if ingredient not in recipe.ingredients:
+                        recipe.ingredients.append(ingredient)
         # for i in steps:
         #     recipe.analyzedInstructions[i['number']] = i['step']
         # return recipe
@@ -205,9 +229,10 @@ class Controller:
     @staticmethod
     def check_name_len(name1, name2):
         len_name1 = name1.split(' ')
-        len_name2 = name2.split(' ')
-        if len_name1 > len_name2:
-            return name2
+        if name2:
+            len_name2 = name2.split(' ')
+            if len_name1 > len_name2:
+                return name2
         return name1
 
     @staticmethod
@@ -215,23 +240,77 @@ class Controller:
         new_amount = amount
         new_unit = unit
         if unit in ['l', 'ltr']:
-            new_amount = int(float(amount) * 1000)
+            new_amount = int(round(float(amount) * 1000, 0))
             new_unit = 'ml'
         elif unit in ['kg', 'kgs']:
-            new_amount = int(float(amount) * 1000)
+            new_amount = int(round(float(amount) * 1000, 0))
             new_unit = 'g'
         elif unit in ['tbsp', 'tbsps', 'Tbsp', 'Tbsps', 'sp', 'sps']:
-            new_amount = int(amount) * 0.02
+            new_amount = int(round(amount * 0.02, 0))
             new_unit = 'g'
         elif unit in ['tsp', 'tsps']:
-            new_amount = int(amount) * 0.01
+            new_amount = int(round(amount * 0.01, 0))
             new_unit = 'g'
         elif unit in ['cup', 'tea cup', 'glass']:
-            new_amount = int(amount) * 0.2
+            new_amount = int(round(amount * 0.2, 0))
             new_unit = 'ml'
-        elif unit in ['', 'serving', 'servings', 'large', 'large bunch', 'cloves', 'can', 'cans', 'bunch', 'small', 'medium', 'pinch']:
+        elif unit in ['gallon', 'gallons']:
+            new_amount = int(round(amount * 3785, 0))
+            new_unit = 'ml'
+        elif unit in ['', 'serving', 'servings', 'large', 'large bunch', 'cloves', 'can', 'cans', 'bunch', 'small',
+                      'medium', 'pinch']:
             new_unit = 'count'
         return str(new_amount), new_unit
+
+    def handle_letter(self, ltr):
+        if ltr == 'enter':
+            self.view.quantity_entry.focus()
+            return
+        elif ltr == 'space':
+            ltr = ' '
+        elif ltr == 'del':
+            txt = self.view.name_entry.get()
+            self.view.name_entry.delete(0, END)
+            self.view.name_entry.insert(0, txt[:-1])
+            ltr = ''
+        self.view.name_entry.insert(END, ltr)
+        self.view.name_entry.focus()
+
+
+
+    def make_letter_buttons(self, parent):
+        inner_counter = 0
+        # for n in string.digits:
+        #     ttk.Button(parent, text=n, command=lambda ltr=n: self.handle_letter(ltr), width=3,
+        #                padding=3, style='my.TButton').grid(column=(inner_counter % 10), row=inner_counter // 10, sticky='news', padx=2,
+        #                                pady=2)
+        #     inner_counter += 1
+        for i in string.ascii_lowercase:
+            ttk.Button(parent, text=i, command=lambda ltr=i: self.handle_letter(ltr), width=3,
+                                               padding=3, style='my.TButton').grid(column=(inner_counter % 10), row=inner_counter // 10, sticky='news', padx=2,
+                                       pady=2)
+            inner_counter += 1
+        # ttk.Button(parent, text='.', command=lambda ltr='.': self.handle_letter(ltr), width=3,
+        #                padding=3, style='my.TButton').grid(column=(inner_counter % 10), row=inner_counter // 10, sticky='news', padx=2,
+        #                                pady=2)
+        # inner_counter += 1
+        ttk.Button(parent, text='del', command=lambda ltr='del': self.handle_letter(ltr), padding=3, style='my.TButton').grid(
+            column=inner_counter % 10, row=inner_counter // 10, columnspan=10 - ((inner_counter - 1) % 10),
+            sticky='news',
+            padx=2, pady=2
+        )
+        inner_counter += 1
+        ttk.Button(parent, text='space', command=lambda ltr='space': self.handle_letter(ltr), padding=3, style='my.TButton').grid(
+            column=0, row=(inner_counter // 10) + 1, columnspan=10,
+            sticky='news',
+            padx=2, pady=2,
+        )
+        inner_counter += 1
+        ttk.Button(parent, text='Enter', command=lambda ltr='enter': self.handle_letter(ltr), padding=3, style='my.TButton').grid(
+            column=0, row=(inner_counter // 10) + 2, columnspan=10,
+            sticky='news',
+            padx=2, pady=2, ipady=12
+        )
 
     @staticmethod
     def write_recipe_to_file(results):
@@ -286,33 +365,63 @@ class Controller:
             (self.view.fifth_user_entry, self.view.fifth_user_mail_entry),
             (self.view.sixth_user_entry, self.view.sixth_user_mail_entry),
             (self.view.sev_user_entry, self.view.sev_user_mail_entry),
-                 ]
+        ]
         fridge_name = self.view.init_name_entry.get()
-        self.fridge.name = self.db.check_fridge_name(fridge_name)
-        for i in range(0, self.view.clean_row - 3):
+        valid_name = False
+        if fridge_name:
+            self.fridge.name = self.db.check_fridge_name(fridge_name)
+            valid_name = True
+        else:
+            self.view.invalid_name_message.grid(column=1, columnspan=3, row=11)
+        if valid_name:
+            for i in range(0, self.view.clean_row - 3):
+                try:
+
+                    fu = names[i][0].get()
+                    if not fu:
+                        self.view.invalid_username_message.grid(column=1, columnspan=3, row=11)
+                    else:
+                        fm = names[i][1].get()
+                        self.is_valid = validate_email(fm)
+                        if not self.is_valid:
+                            self.view.invalid_mail_message.grid(column=1, columnspan=3, row=11)
+                    # while not is_valid:
+                    #     fm = names[i][1].get()
+                    #     is_valid = validate_email(fm)
+
+                    if fu and fm and self.is_valid:
+                        self.view.invalid_username_message.grid_forget()
+                        self.view.invalid_mail_message.grid_forget()
+                        user = User(
+                            username=fu.capitalize(),
+                            mail=fm,
+                            fridge_id=self.fridge.id
+                        )
+
+                        self.session.add(user)
+                        self.session.commit()
+                except IndexError:
+                    pass
             try:
-
-                fu = names[i][0].get()
-                fm = names[i][1].get()
-                if fu and fm:
-                    user = User(
-                        username=fu.capitalize(),
-                        mail=fm,
-                        fridge_id=self.fridge.id
-                    )
-
-                    self.session.add(user)
+                if self.is_valid:
                     self.session.commit()
-            except IndexError:
+                    if not self.db.get_all_sub_cat(self.session):
+                        for i in self.db.CATEGORIES:
+                            s_c = SubCategory(name=i)
+                            self.session.add(s_c)
+                            self.session.commit()
+                    self.view.welcome['text'] = f'Welcome,\n{self.fridge.name}'
+                    self.view.on_start()
+            except AttributeError:
                 pass
-        self.session.commit()
-        if not self.db.get_all_sub_cat(self.session):
-            for i in self.db.CATEGORIES:
-                s_c = SubCategory(name=i)
-                self.session.add(s_c)
-                self.session.commit()
-        self.view.welcome['text'] = f'Welcome,\n{self.fridge.name}'
-        self.view.on_start()
+
+    @staticmethod
+    def remove_digits(name):
+        n_name = ''
+        for ch in name:
+            if not ch.isdigit():
+                n_name += ch
+        return n_name
 
     def recipe_action_buttons(self, action):
         if action == 'generate':
@@ -324,7 +433,8 @@ class Controller:
             else:
                 self.view.clear_used_missed_instructions()
                 self.view.set_recipes([])
-                self.view.recipe_description_text.insert(1.0, 'Sorry! No products selected!\nYou can try choosing products\nor try get random recipe!')
+                self.view.recipe_description_text.insert(1.0,
+                                                         'Sorry! No products selected!\nYou can try choosing products\nor try get random recipe!')
         elif action == 'random':
             self.view.recipes_from_chosen_products = []
             self.view.random_recipes = self.get_random_recipes()
@@ -334,9 +444,7 @@ class Controller:
             if self.chosen_recipe is not None:
                 if not self.db.check_if_recipe_in_fridge(self.session, self.chosen_recipe):
                     self.chosen_recipe.fridge_id = self.fridge.id
-
-                    if not self.db.check_if_recipe_in_fridge(self.session, self.chosen_recipe):
-                        self.db.add_recipe_to_fridge(self.session, self.chosen_recipe)
+                    self.db.add_recipe_to_fridge(self.session, self.chosen_recipe)
         elif action == 'favourites':
             self.chosen_recipe = None
             self.view.recipes_from_chosen_products = []
@@ -346,8 +454,10 @@ class Controller:
                 self.view.clear_used_missed_instructions()
             else:
                 self.view.clear_used_missed_instructions()
-                self.view.recipe_description_text.insert(1.0, 'Sorry! No favourite recipes available!\nAdd favourite recipes first!')
+                self.view.recipe_description_text.insert(1.0,
+                                                         'Sorry! No favourite recipes available!\nAdd favourite recipes first!')
         elif action == 'shopping_list':
+            self.data = 'Shopping List:\nno chosen products'
             if self.chosen_recipe:
                 for ingred in self.chosen_recipe.ingredients:
                     if ingred:
@@ -355,43 +465,44 @@ class Controller:
                         ingr = self.check_if_ingredient_is_shopping_list(ingred)
                         if not item and ingr:
                             self.view.shopping.append(ingred)
-                self.data = 'Shopping List\n'
                 counter = 0
+                self.data = 'Shopping List:\n'
                 for i in self.view.shopping:
                     new_i = i.name.replace("'", '')
                     txt = f'• {new_i} - {i.amount} {i.unit}\n'
                     self.data += f'• {new_i} - {i.amount} {i.unit}\n'
-                    # i = Label(self.view.shopping_list_content)
-                    # i.grid(column=0, row=counter)
-                    Label(self.view.shopping_list_content, text=txt).grid(column=0, row=counter, sticky='wns')
-                    Button(self.view.shopping_list_content, text='x', command=lambda x=i: self.remove(x)).grid(column=1, row=counter, sticky='ens')
-
-                    # Label(self.view.shopping_list_content, text=txt).grid(column=0, row=counter)
-                    # Button(self.view.shopping_list_content, text='x', command=lambda x=i: self.remove(x)).grid(column=1, row=counter)
+                    if counter <= 9:
+                        Label(self.view.shopping_list_content, text=txt).grid(column=0, row=counter, sticky='wns')
+                        Button(self.view.shopping_list_content, text='x', command=lambda x=i: self.remove(x)).grid(
+                            column=1, row=counter, sticky='ens', padx=6)
+                    else:
+                        Label(self.view.shopping_list_content2, text=txt).grid(column=0, row=counter - 10, sticky='wns')
+                        Button(self.view.shopping_list_content2, text='x', command=lambda x=i: self.remove(x)).grid(
+                            column=1, row=counter - 10, sticky='ens', padx=6)
                     counter += 1
             img = segno.make(self.data)
-            img.save('images/data.png', border=2, scale=3)
-
-            # for content in self.fridge.content:
-            #     # print(self.chosen_recipe.ingredients)
-            #     # a = self.chosen_recipe
-            #     for ingr in self.chosen_recipe.ingredients:
-            #         print(ingr)
-            #         if ingr.name not in content.name:
-            #             self.view.shopping_list.append(ingr)
-
-            if self.view.shopping:
-                global qr
-                qr = PhotoImage(file='images/data.png')
-                self.view.label_qr.config(image=qr)
-                self.view.label_qr.grid(column=0, row=0)
-            # self.view.qr['image'] = qr
-            # self.view.qr.grid(column=0, row=0)
+            img.save('images/data.png', border=2, scale=7)
+            imgo = PIL.Image.open("images/data.png")
+            resized_image = imgo.resize((250, 250))
+            global qr
+            qr = ImageTk.PhotoImage(resized_image)
+            self.view.label_qr.config(image=qr)
             self.view.raise_above_all(self.view.shopping_list_frame, '')
             print(self.view.shopping)
 
         elif action == 'get_shopping_list':
-            # data = ''
+            data = 'Shopping List:\nno chosen products'
+            if self.view.shopping:
+                data = 'Shopping List:\n'
+            img = segno.make(data)
+            img.save('images/data.png', border=2, scale=7)
+            imgo = PIL.Image.open("images/data.png")
+            resized_image = imgo.resize((250, 250))
+            global qq
+            qq = ImageTk.PhotoImage(resized_image)
+            self.view.label_qr.config(image=qq)
+            self.view.raise_above_all(self.view.shopping_list_frame, '')
+            print(self.view.shopping)
             # for i in self.view.shopping_list:
             #     data += f'&#  {i} &#x2718"\n"'
             #     self.view.shopping_list_content['text'] = data
@@ -404,10 +515,10 @@ class Controller:
             # ph = ImageTk.PhotoImage(im)
             # self.view.qr['image'] = ph
             # self.view.choiceshopvar.set(self.view.shopping)
-            if self.view.shopping:
-                qr = PhotoImage(file='images/data.png')
-                self.view.label_qr.config(image=qr)
-                self.view.label_qr.grid(column=0, row=0)
+            # if self.view.shopping:
+            #     qr = PhotoImage(file='images/data.png')
+            #     self.view.label_qr.config(image=qr)
+            #     self.view.label_qr.grid(column=0, row=0)
             # self.view.qr['image'] = qr
             # self.view.qr.grid(column=0, row=0)
             self.view.raise_above_all(self.view.shopping_list_frame, '')
@@ -420,46 +531,69 @@ class Controller:
         a = self.view.shopping_list_content.winfo_children()
         for i in a:
             i.destroy()
-        self.data = 'Shopping List\n'
+        b = self.view.shopping_list_content2.winfo_children()
+        for i in b:
+            i.destroy()
+        self.data = 'Shopping List:\nno chosen products'
+        if self.view.shopping:
+            self.data = 'Shopping List:\n'
         counter = 0
         for i in self.view.shopping:
             new_i = i.name.replace("'", '')
             txt = f'• {new_i} - {i.amount} {i.unit}\n'
             self.data += f'• {new_i} - {i.amount} {i.unit}\n'
-            Label(self.view.shopping_list_content, text=txt).grid(column=0, row=counter, sticky='wns')
-            Button(self.view.shopping_list_content, text='x', command=lambda x=i: self.remove(x)).grid(column=1, row=counter,
-                                                                                                       sticky='ens')
+            if counter <= 9:
+                Label(self.view.shopping_list_content, text=txt).grid(column=0, row=counter, sticky='wns')
+                Button(self.view.shopping_list_content, text='x', command=lambda x=i: self.remove(x)).grid(column=1,
+                                                                                                           row=counter,
+                                                                                                           sticky='ens',
+                                                                                                           padx=6)
+            else:
+                Label(self.view.shopping_list_content2, text=txt).grid(column=0, row=counter - 10, sticky='wns')
+                Button(self.view.shopping_list_content2, text='x', command=lambda x=i: self.remove(x)).grid(column=1,
+                                                                                                            row=counter - 10,
+                                                                                                            sticky='ens',
+                                                                                                            padx=6)
             counter += 1
         img = segno.make(self.data)
-        img.save('images/data.png', border=2, scale=3)
-        if self.view.shopping:
-            global qr
-            qr = PhotoImage(file='images/data.png')
-            self.view.label_qr.config(image=qr)
-            self.view.label_qr.grid(column=0, row=0)
+        img.save('images/data.png', border=2, scale=7)
+        imgo = PIL.Image.open("images/data.png")
+        resized_image = imgo.resize((250, 250))
+        global qr
+        qr = ImageTk.PhotoImage(resized_image)
+        self.view.label_qr.config(image=qr)
+        # if self.view.shopping:
+        #     global qr
+        #     qr = PhotoImage(file='images/data.png')
+        #     self.view.label_qr.config(image=qr)
+        #     self.view.label_qr.grid(column=0, row=0)
         self.view.raise_above_all(self.view.shopping_list_frame, '')
 
     def clear_shopping_list(self):
         a = self.view.shopping_list_content.winfo_children()
+        b = self.view.shopping_list_content2.winfo_children()
         for i in a:
             i.destroy()
+        for i in b:
+            i.destroy()
         self.view.shopping = []
-        self.data = 'Shopping List\n'
+        self.data = 'Shopping List:\nno chosen products'
         counter = 0
-        for i in self.view.shopping:
-            new_i = i.name.replace("'", '')
-            txt = f'• {new_i} - {i.amount} {i.unit}\n'
-            self.data += f'• {new_i} - {i.amount} {i.unit}\n'
-            Label(self.view.shopping_list_content, text=txt).grid(column=0, row=counter, sticky='nsw')
-            Button(self.view.shopping_list_content, text='x', command=lambda x=i: self.remove(x)).grid(column=1,
-                                                                                                       row=counter, sticky='ens')
-            counter += 1
+        # for i in self.view.shopping:
+        #     new_i = i.name.replace("'", '')
+        #     txt = f'• {new_i} - {i.amount} {i.unit}\n'
+        #     self.data += f'• {new_i} - {i.amount} {i.unit}\n'
+        #     Label(self.view.shopping_list_content, text=txt).grid(column=0, row=counter, sticky='nsw')
+        #     Button(self.view.shopping_list_content, text='x', command=lambda x=i: self.remove(x)).grid(column=1,
+        #                                                                                                row=counter, sticky='ens')
+        #     counter += 1
         img = segno.make(self.data)
-        img.save('images/data.png', border=2, scale=3)
+        img.save('images/data.png', border=2, scale=7)
+        imgo = PIL.Image.open("images/data.png")
+        resized_image = imgo.resize((250, 250))
         global qr
-        qr = PhotoImage(file='images/data.png')
+        qr = ImageTk.PhotoImage(resized_image)
         self.view.label_qr.config(image=qr)
-        self.view.label_qr.grid(column=0, row=0)
 
     def change_spinbox(self, e):
         units = ('count', 'ml', 'l', 'g', 'kg')
@@ -474,35 +608,49 @@ class Controller:
         current_value = self.view.quantity_entry.get()
         if not current_value:
             if sel_unit == units[0]:
-                self.view.quantity_entry.config(from_=data[units[0]][0], to=data[units[0]][1], increment=data[units[0]][2])
+                self.view.quantity_entry.config(from_=data[units[0]][0], to=data[units[0]][1],
+                                                increment=data[units[0]][2])
                 # self.view.quantity_val.set(data[units[0]][0])
                 # self.view.update()
             elif sel_unit == units[1]:
-                self.view.quantity_entry.config(from_=data[units[1]][0], to=data[units[1]][1], increment=data[units[1]][2])
+                self.view.quantity_entry.config(from_=data[units[1]][0], to=data[units[1]][1],
+                                                increment=data[units[1]][2])
                 # self.view.quantity_val.set(data[units[1]][0])
                 # self.view.update()
             elif sel_unit == units[2]:
-                self.view.quantity_entry.config(from_=data[units[2]][0], to=data[units[2]][1], increment=data[units[2]][2])
+                self.view.quantity_entry.config(from_=data[units[2]][0], to=data[units[2]][1],
+                                                increment=data[units[2]][2])
                 # self.view.quantity_val.set(data[units[2]][0])
                 # self.view.update()
             elif sel_unit == units[3]:
-                self.view.quantity_entry.config(from_=data[units[3]][0], to=data[units[3]][1], increment=data[units[3]][2])
+                self.view.quantity_entry.config(from_=data[units[3]][0], to=data[units[3]][1],
+                                                increment=data[units[3]][2])
                 # self.view.quantity_val.set(data[units[3]][0])
                 # self.view.update()
             elif sel_unit == units[4]:
-                self.view.quantity_entry.config(from_=data[units[4]][0], to=data[units[4]][1], increment=data[units[4]][2])
+                self.view.quantity_entry.config(from_=data[units[4]][0], to=data[units[4]][1],
+                                                increment=data[units[4]][2])
                 # self.view.quantity_val.set(data[units[4]][0])
                 # self.view.update()
+            self.view.quantity_entry['state'] = 'active'
         else:
             if sel_unit in ['ml', 'g']:
                 value = int(float(current_value) * 1000)
                 self.view.quantity_val.set(value)
-                self.view.quantity_entry.config(from_=data[units[1]][0], to=data[units[1]][1], increment=data[units[1]][2])
+                self.view.quantity_entry.config(from_=data[units[1]][0], to=data[units[1]][1],
+                                                increment=data[units[1]][2])
                 # self.view.update()
             elif sel_unit in ['l', 'kg']:
                 value = float(current_value) / 1000
                 self.view.quantity_val.set(value)
-                self.view.quantity_entry.config(from_=data[units[2]][0], to=data[units[2]][1], increment=data[units[2]][2])
+                self.view.quantity_entry.config(from_=data[units[2]][0], to=data[units[2]][1],
+                                                increment=data[units[2]][2])
+                # self.view.update()
+            elif sel_unit in ['count']:
+                value = int(float(current_value))
+                self.view.quantity_val.set(value)
+                self.view.quantity_entry.config(from_=data[units[0]][0], to=data[units[0]][1],
+                                                increment=data[units[0]][2])
                 # self.view.update()
 
     def destroy_top_btn(self):
@@ -513,37 +661,49 @@ class Controller:
         for item in self.expired_products:
             self.db.delete_item_from_fridge(self.session, item)
         self.view.pop_expired.destroy()
-        self.view.pop_expired_label.destroy()
-
-
 
     def send_mail(self, *arg):
-        # mail = ''
+        mail = 'empty'
+        data = 'Shopping List:\n'
+        if self.view.shopping:
+            for i in self.view.shopping:
+                new_i = i.name.replace("'", '')
+                # txt = f'• {new_i} - {i.amount} {i.unit}\n'
+                data += f'• {new_i} - {i.amount} {i.unit}\n'
         if arg:
             mail = arg
-        else:
-            mail = self.view.mail_entry_r.get()
+
+        qr_mail = segno.helpers.make_email(to=mail, subject='Shopping List', body=data)
+        qr_mail.save('images/qr_mail.png', border=2, scale=7)
+        imgo = PIL.Image.open("images/qr_mail.png")
+        resized_image = imgo.resize((250, 250))
         global qr_to_send
-        qr_mail = segno.helpers.make_email(to=mail, subject='Shopping List', body=self.data)
-        qr_mail.save('images/qr_mail.png', border=2, scale=3)
-        qr_to_send = PhotoImage(file='images/qr_mail.png')
+        qr_to_send = ImageTk.PhotoImage(resized_image)
+        # self.view.label_qr.config(image=qr_to_send)
         # self.view.label_qr.config(image=qr)
         # self.view.label_qr.grid(column=0, row=0)
         # time.sleep(0.5)
         # self.pop = Label(self.view.shopping_list_frame, image=qr_to_send)
-        self.pop = Button(self.view.shopping_list_frame, image=qr_to_send, command=self.destroy_top_btn)
-        self.pop_label = Label(self.view.shopping_list_frame, text='Click to return', font=('bold', 10))
-        self.pop.grid(column=0, row=1, sticky='news')
+
+        self.pop = ttk.Button(self.view.left_box, image=qr_to_send, command=self.destroy_top_btn)
+        self.pop_label = Label(self.view.left_box, text='Click to return', font=('bold', 16))
+        self.pop.grid(column=0, row=0, sticky='news')
         self.pop_label.grid(column=0, row=2, sticky='news')
 
     def add_new_user(self):
         self.name_btns = [
-            [self.view.sec_user_label, self.view.sec_user_entry, self.view.sec_user_mail, self.view.sec_user_mail_entry],
-            [self.view.third_user_label, self.view.third_user_entry, self.view.third_user_mail, self.view.third_user_mail_entry],
-            [self.view.four_user_label, self.view.four_user_entry, self.view.four_user_mail, self.view.four_user_mail_entry],
-            [self.view.fifth_user_label, self.view.fifth_user_entry, self.view.fifth_user_mail, self.view.fifth_user_mail_entry],
-            [self.view.sixth_user_label, self.view.sixth_user_entry, self.view.sixth_user_mail, self.view.sixth_user_mail_entry],
-            [self.view.sev_user_label, self.view.sev_user_entry, self.view.sev_user_mail, self.view.sev_user_mail_entry],
+            [self.view.sec_user_label, self.view.sec_user_entry, self.view.sec_user_mail,
+             self.view.sec_user_mail_entry],
+            [self.view.third_user_label, self.view.third_user_entry, self.view.third_user_mail,
+             self.view.third_user_mail_entry],
+            [self.view.four_user_label, self.view.four_user_entry, self.view.four_user_mail,
+             self.view.four_user_mail_entry],
+            [self.view.fifth_user_label, self.view.fifth_user_entry, self.view.fifth_user_mail,
+             self.view.fifth_user_mail_entry],
+            [self.view.sixth_user_label, self.view.sixth_user_entry, self.view.sixth_user_mail,
+             self.view.sixth_user_mail_entry],
+            [self.view.sev_user_label, self.view.sev_user_entry, self.view.sev_user_mail,
+             self.view.sev_user_mail_entry],
 
         ]
         try:
@@ -556,18 +716,15 @@ class Controller:
         except IndexError:
             self.view.add_user_btn.config(state='disabled')
 
-
-
-
-
     def check_if_ingredient_is_in_fridge(self, ingredient):
-        self.ingredients_not_to_buy = ['water', 'salt', 'table salt', 'salt and pepper', 'flour']
+
         for item in self.fridge.content:
             if item.name in ingredient.name or ingredient.name in item.name or ingredient.name in self.ingredients_not_to_buy:
 
                 if float(item.amount) >= float(ingredient.amount):
                     new_amount = float(item.amount) - float(ingredient.amount)
-                    self.db.set_data_for_item_from_name(self.session, item.name, item.name, int(new_amount), item.unit, item.expiry, item.sub_category)
+                    self.db.set_data_for_item_from_name(self.session, item.name, item.name, int(new_amount), item.unit,
+                                                        item.expiry, item.sub_category)
                     return item
 
     def check_if_ingredient_is_shopping_list(self, ingredient):
@@ -579,39 +736,47 @@ class Controller:
         else:
             return ingredient
 
-
     def item_action_buttons(self, action):
         try:
             if action == 'clear':
                 self.last_item = ''
                 self.view.set_values()
+                self.generate_choices()
                 self.view.enable_buttons()
+                self.last_item = ''
                 self.view.units_entry['values'] = ('count', 'ml', 'l', 'g', 'kg')
+                self.view.units_entry.set('')
                 self.view.name_entry.focus()
+                self.view.quantity_entry['state'] = 'disabled'
 
             elif action == 'add':
                 name_item, quantity, unit, expiry_date, sub_category = self.view.get_values()
-                if name_item:
+                if name_item and unit and quantity:
                     data = self.check_if_item_in_fridge(name_item, expiry_date, quantity, unit, name_item)
 
                     new_name, n_expiry_date, n_quantity, n_unit, to_be_updated, last_checked_name = data
                     if not to_be_updated:
 
                         item = Item(name=new_name, amount=n_quantity, unit=n_unit, expiry=str(n_expiry_date),
-                                    sub_category_id=self.db.get_sub_id(self.session, sub_category), fridge_id=self.fridge.id)
+                                    sub_category_id=self.db.get_sub_id(self.session, sub_category),
+                                    fridge_id=self.fridge.id)
                         print(item)
                         self.last_item = item
                         self.db.add_item_to_fridge(self.session, item)
                     else:
-                        self.db.set_data_for_item_from_name(self.session, last_checked_name, new_name, n_quantity, n_unit,
+                        self.db.set_data_for_item_from_name(self.session, last_checked_name, new_name, n_quantity,
+                                                            n_unit,
                                                             n_expiry_date, sub_category)
 
-                    self.view.set_values()
-                    self.generate_choices()
-                    self.view.enable_buttons()
-                    self.last_item = ''
-                    self.view.units_entry['values'] = ('count', 'ml', 'l', 'g', 'kg')
-                    self.view.name_entry.focus()
+                self.last_item = ''
+                self.view.set_values()
+                self.generate_choices()
+                self.view.enable_buttons()
+                self.last_item = ''
+                self.view.units_entry['values'] = ('count', 'ml', 'l', 'g', 'kg')
+                self.view.units_entry.set('')
+                self.view.name_entry.focus()
+                self.view.quantity_entry['state'] = 'disabled'
 
 
             elif action == 'delete':
@@ -621,7 +786,9 @@ class Controller:
                 self.view.enable_buttons()
                 self.last_item = ''
                 self.view.units_entry['values'] = ('count', 'ml', 'l', 'g', 'kg')
+                self.view.units_entry.set('')
                 self.view.name_entry.focus()
+                self.view.quantity_entry['state'] = 'disabled'
 
             elif action == 'update':
                 name_item, quantity, unit, expiry_date, sub_category = self.view.get_values()
@@ -644,7 +811,9 @@ class Controller:
                 self.view.enable_buttons()
                 self.last_item = ''
                 self.view.units_entry['values'] = ('count', 'ml', 'l', 'g', 'kg')
+                self.view.units_entry.set('')
                 self.view.name_entry.focus()
+                self.view.quantity_entry['state'] = 'disabled'
 
             elif action == 'remove':
                 _, quantity, unit, _, _ = self.view.get_values()
@@ -659,7 +828,8 @@ class Controller:
                     # print(new_quantity)
                 if new_quantity >= 1:
                     self.db.set_data_for_item_from_name(self.session,
-                                                        old_name, old_name, int(new_quantity), old_unit, old_expiry, old_sub)
+                                                        old_name, old_name, int(new_quantity), old_unit, old_expiry,
+                                                        old_sub)
                 else:
                     self.db.delete_item_from_fridge(self.session, self.last_item)
                 self.view.set_values()
@@ -668,6 +838,7 @@ class Controller:
                 self.last_item = ''
                 self.view.units_entry['values'] = ('count', 'ml', 'l', 'g', 'kg')
                 self.view.name_entry.focus()
+                self.view.quantity_entry['state'] = 'disabled'
 
         except AttributeError:
             pass
@@ -715,21 +886,11 @@ class Controller:
         except KeyError:
             pass
 
+
     def remove_from_fridge_if_any(self):
-        for sh in self.view.shopping:
-            fridge_analog = self.db.get_data_for_item_from_name(self.session, sh)
-
-            new_quantity = 1
-            if sh.unit == fridge_analog.unit:
-                new_quantity = float(fridge_analog.unit) - float(sh.unit)
-                # print(new_quantity)
-            if new_quantity >= 1:
-                self.db.set_data_for_item_from_name(self.session, fridge_analog.name, fridge_analog.name, int(new_quantity),
-                                                    fridge_analog.unit, fridge_analog.expiry)
-            else:
-                self.db.delete_item_from_fridge(self.session, fridge_analog)
-
-
+        all_from_db = self.db.get_all_items_from_fridge(self.session, self.fridge.id)
+        self.db.delete_zero_amount_item_from_fridge(self.session, all_from_db)
+        self.view.quit()
 
     def remole_li(self, instructions):
         if instructions:
