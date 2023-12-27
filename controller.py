@@ -44,6 +44,7 @@ class Controller:
         self.fridge = self.session.get(Fridge, 1)
         self.expired_products = []
         self.check_for_expired_products()
+        self.wait = False
         self.view = View(self)
         self.generate_choices()
         self.last_item = ''
@@ -245,22 +246,31 @@ class Controller:
         elif unit in ['kg', 'kgs']:
             new_amount = int(round(float(amount) * 1000, 0))
             new_unit = 'g'
-        elif unit in ['tbsp', 'tbsps', 'Tbsp', 'Tbsps', 'sp', 'sps']:
-            new_amount = int(round(amount * 0.02, 0))
+        elif unit in ['tbsp', 'tbsps', 'Tbsp', 'Tb', 'Tbs', 'Tbsps', 'sp', 'sps']:
+            new_amount = float(amount) * 20
             new_unit = 'g'
         elif unit in ['tsp', 'tsps']:
-            new_amount = int(round(amount * 0.01, 0))
+            new_amount = float(amount) * 10
             new_unit = 'g'
         elif unit in ['cup', 'tea cup', 'glass']:
-            new_amount = int(round(amount * 0.2, 0))
+            new_amount = float(amount) * 200
             new_unit = 'ml'
         elif unit in ['gallon', 'gallons']:
             new_amount = int(round(amount * 3785, 0))
             new_unit = 'ml'
+        elif unit in ['Lb', 'lb', 'pound', 'pounds']:
+            new_amount = int(round(amount * 454, 0))
+            new_unit = 'g'
         elif unit in ['', 'serving', 'servings', 'large', 'large bunch', 'cloves', 'can', 'cans', 'bunch', 'small',
-                      'medium', 'pinch']:
+                      'medium', 'pinch', 'pkg', 'stalks', 'inch', 'inches', 'fillet', 'clove', 'small bunch', 'Bunch',
+                      'loaf', 'large clove', 'leaf', 'Clove', 'head', 'pinches', 'large can']:
             new_unit = 'count'
         return str(new_amount), new_unit
+
+    def open_settings(self, command):
+        self.wait = command
+        time.sleep(5)
+        self.view.initial = self.view.make_initial_window(self.view.root, command)
 
     def handle_letter(self, ltr):
         if ltr == 'enter':
@@ -376,30 +386,31 @@ class Controller:
         if valid_name:
             for i in range(0, self.view.clean_row - 3):
                 try:
-
                     fu = names[i][0].get()
                     if not fu:
                         self.view.invalid_username_message.grid(column=1, columnspan=3, row=11)
                     else:
-                        fm = names[i][1].get()
-                        self.is_valid = validate_email(fm)
+                        self.fm = names[i][1].get()
+                        self.is_valid = validate_email(self.fm)
                         if not self.is_valid:
                             self.view.invalid_mail_message.grid(column=1, columnspan=3, row=11)
                     # while not is_valid:
                     #     fm = names[i][1].get()
                     #     is_valid = validate_email(fm)
 
-                    if fu and fm and self.is_valid:
+                    if fu and self.fm and self.is_valid:
                         self.view.invalid_username_message.grid_forget()
                         self.view.invalid_mail_message.grid_forget()
-                        user = User(
-                            username=fu.capitalize(),
-                            mail=fm,
-                            fridge_id=self.fridge.id
-                        )
+                        reg_users = [x.username for x in self.db.get_all_users(self.session, self.fridge.id)]
+                        if fu not in reg_users:
+                            user = User(
+                                username=fu.capitalize(),
+                                mail=self.fm,
+                                fridge_id=self.fridge.id
+                            )
 
-                        self.session.add(user)
-                        self.session.commit()
+                            self.session.add(user)
+                            self.session.commit()
                 except IndexError:
                     pass
             try:
@@ -411,6 +422,7 @@ class Controller:
                             self.session.add(s_c)
                             self.session.commit()
                     self.view.welcome['text'] = f'Welcome,\n{self.fridge.name}'
+                    self.wait = False
                     self.view.on_start()
             except AttributeError:
                 pass
@@ -692,29 +704,59 @@ class Controller:
 
     def add_new_user(self):
         self.name_btns = [
+            [self.view.first_user_label, self.view.first_user_entry, self.view.first_user_mail,
+             self.view.first_user_mail_entry, self.view.update_first_user, self.view.delete_first_user,],
+
             [self.view.sec_user_label, self.view.sec_user_entry, self.view.sec_user_mail,
-             self.view.sec_user_mail_entry],
+             self.view.sec_user_mail_entry, self.view.update_sec_user, self.view.delete_sec_user,],
             [self.view.third_user_label, self.view.third_user_entry, self.view.third_user_mail,
-             self.view.third_user_mail_entry],
+             self.view.third_user_mail_entry, self.view.update_third_user, self.view.delete_third_user,],
             [self.view.four_user_label, self.view.four_user_entry, self.view.four_user_mail,
-             self.view.four_user_mail_entry],
+             self.view.four_user_mail_entry, self.view.update_four_user, self.view.delete_four_user, ],
             [self.view.fifth_user_label, self.view.fifth_user_entry, self.view.fifth_user_mail,
-             self.view.fifth_user_mail_entry],
+             self.view.fifth_user_mail_entry, self.view.update_fifth_user, self.view.delete_fifth_user, ],
             [self.view.sixth_user_label, self.view.sixth_user_entry, self.view.sixth_user_mail,
-             self.view.sixth_user_mail_entry],
+             self.view.sixth_user_mail_entry, self.view.update_sixth_user, self.view.delete_sixth_user, ],
             [self.view.sev_user_label, self.view.sev_user_entry, self.view.sev_user_mail,
-             self.view.sev_user_mail_entry],
+             self.view.sev_user_mail_entry, self.view.update_sev_user, self.view.delete_sev_user, ],
 
         ]
         try:
-            self.name_btns[self.view.clean_row - 4][0].grid(column=0, row=self.view.clean_row, pady=5, sticky='e')
-            self.name_btns[self.view.clean_row - 4][1].grid(column=1, row=self.view.clean_row, padx=(0, 30))
-            self.name_btns[self.view.clean_row - 4][2].grid(column=2, row=self.view.clean_row, padx=5)
-            self.name_btns[self.view.clean_row - 4][3].grid(column=3, row=self.view.clean_row)
+            self.name_btns[self.view.clean_row - 3][0].grid(column=0, row=self.view.clean_row, pady=5, sticky='e')
+            self.name_btns[self.view.clean_row - 3][1].grid(column=1, row=self.view.clean_row, padx=(0, 30))
+            self.name_btns[self.view.clean_row - 3][2].grid(column=2, row=self.view.clean_row, padx=5)
+            self.name_btns[self.view.clean_row - 3][3].grid(column=3, row=self.view.clean_row)
+            self.name_btns[self.view.clean_row - 3][4].grid(column=4, row=self.view.clean_row, sticky='ew', padx=6)
+            self.name_btns[self.view.clean_row - 3][5].grid(column=5, row=self.view.clean_row, sticky='ew')
 
             self.view.clean_row += 1
         except IndexError:
             self.view.add_user_btn.config(state='disabled')
+
+    def delete_user(self, position):
+        all_users = self.db.get_all_users(self.session, self.fridge.id)
+        for u in range(len(all_users)):
+            if u == position:
+                self.db.del_user_by_user_obj(self.session, all_users[u])
+                self.name_btns[u][0].grid_forget()
+                self.name_btns[u][1].grid_forget()
+                self.name_btns[u][1].delete(0, END)
+                self.name_btns[u][2].grid_forget()
+                self.name_btns[u][3].grid_forget()
+                self.name_btns[u][3].delete(0, END)
+                self.name_btns[u][4].grid_forget()
+                self.name_btns[u][5].grid_forget()
+                # self.view.update()
+
+    def update_user(self, position):
+        all_users = self.db.get_all_users(self.session, self.fridge.id)
+        for u in range(len(all_users)):
+            if u == position:
+                all_users[u].username = self.name_btns[u][1].get()
+                all_users[u].mail = self.name_btns[u][3].get()
+
+                self.session.commit()
+                # self.view.update()
 
     def check_if_ingredient_is_in_fridge(self, ingredient):
 

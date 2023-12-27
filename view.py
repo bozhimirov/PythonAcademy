@@ -77,6 +77,14 @@ class View(Tk):
         self.welcome = ttk.Label(self.root, background='grey', anchor="center", justify='center',
                                  text=f'Welcome,\n{self.controller.fridge.name}', font="Times 40 bold")
         self.welcome.grid(column=0, row=0, sticky='NSEW')
+        set = ttk.Style()
+        set.configure('my.TButton', background='gray', borderwidth=0)
+        pil_image = Image.open('images/settings1.png')
+        global image_settings
+
+        image_settings = ImageTk.PhotoImage(pil_image.resize((20, 20)))
+        settings_btn = Button(self.welcome, width=15, image=image_settings, background='gray', borderwidth=0, command=lambda  action=True: self.controller.open_settings(action))
+        settings_btn.grid(column=0, row=0, sticky='en')
         self.columnconfigure(0, weight=1)
         self.rowconfigure(0, weight=1)
         self.welcome.columnconfigure(0, weight=1)
@@ -883,67 +891,126 @@ class View(Tk):
                                       style='my.TButton')
         self.pop_expired.grid(column=0, columnspan=2, row=0, sticky='news', ipady=220)
 
-    def make_initial_window(self, parent):
+    def make_initial_window(self, parent, *args):
         s = ttk.Style()
         s.configure('my.TButton', font=('Helvetica', 12, 'bold'), justify="center",)
-        if self.controller.fridge.name == 'Change name':
+        if self.controller.fridge.name == 'Change name' or args:
             self.initial_frame = ttk.Frame(self.root)
             self.initial_frame.columnconfigure(0, weight=1)
             self.initial_frame.rowconfigure(0, weight=1)
             self.initial_frame.grid(column=0, row=0, sticky='news')
             self.initial_label = ttk.Label(self.initial_frame, text='Set Fridge', font='Times 30 bold italic',
                                            justify='center')
-            self.initial_label.grid(column=0, columnspan=5, row=0, sticky='n', pady=20)
-            self.initial_box = ttk.Frame(self.initial_frame, padding=(30, 5))
-            self.initial_box.grid(column=0, columnspan=5, row=1, sticky='n')
+            self.initial_label.grid(column=0, columnspan=6, row=0, sticky='n', pady=20)
+            self.initial_box = ttk.Frame(self.initial_frame, padding=(5, 5))
+            self.initial_box.grid(column=0, columnspan=6, row=1, sticky='n')
             self.init_name_label = ttk.Label(self.initial_box, text="Fridge's name: ", font=('Helvetica', 14),
-                                             anchor='n')
-            self.init_name_label.grid(column=0, row=1, sticky='news', pady=20)
+                                             )
+            self.init_name_label.grid(column=0, row=1, sticky='n', pady=12)
             self.init_name_entry = ttk.Entry(self.initial_box, font=('Helvetica', 14))
             self.init_name_entry.grid(column=1, columnspan=3, row=1, sticky='ew')
+
+
             self.first_user_label = ttk.Label(self.initial_box, text='User: ', font=('Helvetica', 12))
-            self.first_user_label.grid(column=0, row=3, pady=5, sticky='e')
+            self.first_user_label.grid(column=0, row=3, pady=5, sticky='en')
             self.first_user_entry = ttk.Entry(self.initial_box, font=('Helvetica', 12))
             self.first_user_entry.grid(column=1, row=3, padx=(0, 30))
             self.first_user_mail = ttk.Label(self.initial_box, text="e-mail: ", font=('Helvetica', 12))
             self.first_user_mail.grid(column=2, row=3, padx=5)
             self.first_user_mail_entry = ttk.Entry(self.initial_box, font=('Helvetica', 12))
             self.first_user_mail_entry.grid(column=3, row=3)
+            self.update_first_user = Button(self.initial_box, text='UPDATE', foreground='white', background='blue',
+                                            font=('Helvetica', 8, 'bold'), command=lambda x=0: self.controller.update_user(x))
+
+            self.update_first_user.grid(column=4, row=3, sticky='ew', padx=6)
+            self.delete_first_user = Button(self.initial_box, text='DELETE', foreground='white', background='red',
+                                            font=('Helvetica', 8, 'bold'), command=lambda x=0: self.controller.delete_user(x))
+
+            self.delete_first_user.grid(column=5, row=3, sticky='ew')
             self.clean_row = 4
             self.sec_user_label = ttk.Label(self.initial_box, text='User: ', font=('Helvetica', 12))
             self.sec_user_entry = ttk.Entry(self.initial_box, font=('Helvetica', 12))
             self.sec_user_mail = ttk.Label(self.initial_box, text="e-mail: ", font=('Helvetica', 12))
             self.sec_user_mail_entry = ttk.Entry(self.initial_box, font=('Helvetica', 12))
+            self.update_sec_user = Button(self.initial_box, text='UPDATE', foreground='white', background='blue',
+                                            font=('Helvetica', 8, 'bold'), command=lambda x=1: self.controller.update_user(x))
+            self.delete_sec_user = Button(self.initial_box, text='DELETE', foreground='white', background='red',
+                                            font=('Helvetica', 8, 'bold'), command=lambda x=1: self.controller.delete_user(x))
             self.third_user_label = ttk.Label(self.initial_box, text='User: ', font=('Helvetica', 12))
             self.third_user_entry = ttk.Entry(self.initial_box, font=('Helvetica', 12))
             self.third_user_mail = ttk.Label(self.initial_box, text="e-mail: ", font=('Helvetica', 12))
             self.third_user_mail_entry = ttk.Entry(self.initial_box, font=('Helvetica', 12))
+            self.update_third_user = Button(self.initial_box, text='UPDATE', foreground='white', background='blue',
+                                            font=('Helvetica', 8, 'bold'), command=lambda x=2: self.controller.update_user(x))
+            self.delete_third_user = Button(self.initial_box, text='DELETE', foreground='white', background='red',
+                                            font=('Helvetica', 8, 'bold'), command=lambda x=2: self.controller.delete_user(x))
             self.four_user_label = ttk.Label(self.initial_box, text='User: ', font=('Helvetica', 12))
             self.four_user_entry = ttk.Entry(self.initial_box, font=('Helvetica', 12))
             self.four_user_mail = ttk.Label(self.initial_box, text="e-mail: ", font=('Helvetica', 12))
             self.four_user_mail_entry = ttk.Entry(self.initial_box, font=('Helvetica', 12))
+            self.update_four_user = Button(self.initial_box, text='UPDATE', foreground='white', background='blue',
+                                            font=('Helvetica', 8, 'bold'), command=lambda x=3: self.controller.update_user(x))
+            self.delete_four_user = Button(self.initial_box, text='DELETE', foreground='white', background='red',
+                                            font=('Helvetica', 8, 'bold'), command=lambda x=3: self.controller.delete_user(x))
+
             self.fifth_user_label = ttk.Label(self.initial_box, text='User: ', font=('Helvetica', 12))
             self.fifth_user_entry = ttk.Entry(self.initial_box, font=('Helvetica', 12))
             self.fifth_user_mail = ttk.Label(self.initial_box, text="e-mail: ", font=('Helvetica', 12))
             self.fifth_user_mail_entry = ttk.Entry(self.initial_box, font=('Helvetica', 12))
+            self.update_fifth_user = Button(self.initial_box, text='UPDATE', foreground='white', background='blue',
+                                            font=('Helvetica', 8, 'bold'), command=lambda x=4: self.controller.update_user(x))
+            self.delete_fifth_user = Button(self.initial_box, text='DELETE', foreground='white', background='red',
+                                            font=('Helvetica', 8, 'bold'), command=lambda x=4: self.controller.delete_user(x))
+
             self.sixth_user_label = ttk.Label(self.initial_box, text='User: ', font=('Helvetica', 12))
             self.sixth_user_entry = ttk.Entry(self.initial_box, font=('Helvetica', 12))
             self.sixth_user_mail = ttk.Label(self.initial_box, text="e-mail: ", font=('Helvetica', 12))
             self.sixth_user_mail_entry = ttk.Entry(self.initial_box, font=('Helvetica', 12))
+            self.update_sixth_user = Button(self.initial_box, text='UPDATE', foreground='white', background='blue',
+                                            font=('Helvetica', 8, 'bold'), command=lambda x=5: self.controller.update_user(x))
+            self.delete_sixth_user = Button(self.initial_box, text='DELETE', foreground='white', background='red',
+                                            font=('Helvetica', 8, 'bold'), command=lambda x=5: self.controller.delete_user(x))
+
             self.sev_user_label = ttk.Label(self.initial_box, text='User: ', font=('Helvetica', 12))
             self.sev_user_entry = ttk.Entry(self.initial_box, font=('Helvetica', 12))
             self.sev_user_mail = ttk.Label(self.initial_box, text="e-mail: ", font=('Helvetica', 12))
             self.sev_user_mail_entry = ttk.Entry(self.initial_box, font=('Helvetica', 12))
-            self.add_user_btn = ttk.Button(self.initial_box, text='Add User', command=self.controller.add_new_user,
-                                           style='my.TButton')
-            self.add_user_btn.grid(column=4, columnspan=2, row=11, sticky='e', pady=10)
-            self.submit_fridge_data_btn = ttk.Button(self.initial_box, text='Submit', style='my.TButton',
-                                                     command=self.controller.initial_data)
-            self.submit_fridge_data_btn.grid(column=1, columnspan=3, row=10, pady=10, sticky='ew')
+            self.update_sev_user = Button(self.initial_box, text='UPDATE', foreground='white', background='blue',
+                                            font=('Helvetica', 8, 'bold'), command=lambda x=6: self.controller.update_user(x))
+            self.delete_sev_user = Button(self.initial_box, text='DELETE', foreground='white', background='red',
+                                            font=('Helvetica', 8, 'bold'), command=lambda x=6: self.controller.delete_user(x))
+
+            self.add_user_btn = Button(self.initial_box, text='ADD USER', command=self.controller.add_new_user, foreground='white',
+                                           font=('Helvetica', 12, 'bold'), background='orange')
+            self.add_user_btn.grid(column=4, columnspan=2, row=11, sticky='es', pady=10)
+            self.submit_fridge_data_btn = Button(self.initial_box, text='SUBMIT', foreground='white', background='green',
+                                                     command=self.controller.initial_data, font=('Helvetica', 12, 'bold'))
+            self.submit_fridge_data_btn.grid(column=1, columnspan=3, row=10, pady=10, sticky='ews')
             self.invalid_name_message = ttk.Label(self.initial_box, text='Invalid name', justify='center', foreground='red', font=('Times', 14, 'bold'))
             self.invalid_username_message = ttk.Label(self.initial_box, text='No username', justify='center', foreground='red', font=('Times', 14, 'bold'))
             self.invalid_mail_message = ttk.Label(self.initial_box, text='Invalid email', justify='center', foreground='red', font=('Times', 14, 'bold'))
-            return self.initial_frame
+
+            if args:
+                name = self.controller.fridge.name[:-9]
+                self.init_name_entry.insert(0, name)
+                all_users = self.controller.db.get_all_users(self.controller.session, self.controller.fridge.id)
+                user_fields = [(self.first_user_entry, self.first_user_mail_entry),
+                               (self.sec_user_entry, self.sec_user_mail_entry),
+                               (self.third_user_entry, self.third_user_mail_entry),
+                               (self.four_user_entry, self.four_user_mail_entry),
+                               (self.fifth_user_entry, self.fifth_user_mail_entry),
+                               (self.sixth_user_entry, self.sixth_user_mail_entry),
+                               (self.sev_user_entry, self.sev_user_mail_entry),
+                               ]
+                inr_countr = 0
+                for u in all_users:
+                    if inr_countr > 0:
+                        self.controller.add_new_user()
+                    user_fields[inr_countr][0].insert(0, u.username)
+                    user_fields[inr_countr][1].insert(0, u.mail)
+                    inr_countr += 1
+            else:
+                return self.initial_frame
         else:
             return self.on_start()
 
@@ -1003,37 +1070,43 @@ class View(Tk):
             self.raise_above_all(self.welcome, '')
             self.frame_stack.pop()
             # with delay 2s
-            # self.after(5000, lambda: self.raise_above_all(self.ask_frame, ''))
+            self.after(5000, lambda: self.raise_above_all(self.ask_frame, ''))
             # without delay for testing
-            self.after(0000, lambda: self.raise_above_all(self.ask_frame, ''))
+            # self.after(0000, lambda: self.raise_above_all(self.ask_frame, ''))
         else:
             self.raise_above_all(self.initial, '')
 
     def raise_above_all(self, win1, action):
-        win1.lift()
-        if self.frame_stack and win1 != self.frame_stack[0]:
-            if win1 != self.frame_stack[-1]:
-                self.frame_stack.append(win1)
+        if win1 == self.ask_frame and self.controller.wait:
+            try:
+                self.initial.lift()
+            except AttributeError:
+                pass
         else:
-            self.frame_stack.clear()
-            self.frame_stack.append(win1)
-        self.sub_cat = action
-        if self.sub_cat == 'random':
-            self.clear_used_missed_instructions()
-            self.random_recipes = self.controller.get_random_recipes()
-            self.set_recipes(self.random_recipes)
-        elif self.sub_cat == 'favourite':
-            self.clear_used_missed_instructions()
-            self.controller.chosen_recipe = None
-            self.set_recipes(self.controller.db.get_all_recipes(self.controller.session, self.controller.fridge.id))
-            self.random_recipes = []
-        elif self.sub_cat == 'choose':
-            self.clear_used_missed_instructions()
-            self.controller.chosen_recipe = None
-            self.set_recipes([])
-            self.random_recipes = []
-        self.middle_menu_label.config(text=self.sub_cat)
-        self.set_values()
+            win1.lift()
+            if self.frame_stack and win1 != self.frame_stack[0]:
+                if win1 != self.frame_stack[-1]:
+                    self.frame_stack.append(win1)
+            else:
+                self.frame_stack.clear()
+                self.frame_stack.append(win1)
+            self.sub_cat = action
+            if self.sub_cat == 'random':
+                self.clear_used_missed_instructions()
+                self.random_recipes = self.controller.get_random_recipes()
+                self.set_recipes(self.random_recipes)
+            elif self.sub_cat == 'favourite':
+                self.clear_used_missed_instructions()
+                self.controller.chosen_recipe = None
+                self.set_recipes(self.controller.db.get_all_recipes(self.controller.session, self.controller.fridge.id))
+                self.random_recipes = []
+            elif self.sub_cat == 'choose':
+                self.clear_used_missed_instructions()
+                self.controller.chosen_recipe = None
+                self.set_recipes([])
+                self.random_recipes = []
+            self.middle_menu_label.config(text=self.sub_cat)
+            self.set_values()
 
     def fall_back_under(self):
         if len(self.frame_stack) > 1:

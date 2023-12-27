@@ -111,37 +111,6 @@ class DataBase:
         item.sub = new_sub
         session.commit()
 
-
-    # @staticmethod
-    # def prepare_data_for_item_from_name(session, name_item, new_name, new_amount, new_unit, new_expiry, new_sub):
-    #     items = select(Item).where(Item.name == name_item)
-    #     item = session.scalars(items).one()
-    #     item.name = new_name
-    #     item.amount = new_amount
-    #     item.unit = new_unit
-    #     item.expiry = new_expiry
-    #     item.sub = new_sub
-    #
-    # @staticmethod
-    # def submit_changes(session):
-    #     session.commit()
-    #
-    # @staticmethod
-    # def get_items_by_category(session, category):
-    #     cats = select(MainCategory).where(MainCategory.name == category)
-    #     cats = session.scalars(cats).one()
-    #     cats_id = cats.id
-    #     print(cats_id)
-    #     subs = select(SubCategory).where(SubCategory.main_category_id == cats_id)
-    #     ssubs = session.scalars(subs)
-    #     print(ssubs)
-    #     cat_items = []
-    #     for sub in ssubs:
-    #         items = select(Item).where(Item.sub_category == sub)
-    #         for item in session.scalars(items):
-    #             cat_items.append(item)
-    #     return cat_items
-
     @staticmethod
     def get_all_items_from_fridge(session, fridge_id):
         all_items = []
@@ -165,6 +134,12 @@ class DataBase:
         for user in session.scalars(users):
             all_users.append(user)
         return all_users
+
+    @staticmethod
+    def del_user_by_user_obj(session, user):
+        c_user = session.get(User, user.id)
+        session.delete(c_user)
+        session.commit()
 
     @staticmethod
     def get_all_sub_cat(session):
