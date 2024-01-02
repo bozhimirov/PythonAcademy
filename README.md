@@ -1,7 +1,7 @@
 # Smart Fridge System App
 
 
-This Smart Fridge System is designed to improve cooking and shopping planning for every user that use fridges in their home and wants to optimize food expenses and food waste. The Smart Fridge System can give easy access of all family members to many recipes to choose from and to optimize cooking by using most of the products in the fridge and to make less shopping expenses, by optimizing already bought food usage and eliminate food waste. Easily generated shopping list and easily sending it to other family members can optimize the time of shopping and expenses for cooking
+This Smart Fridge System is designed to improve cooking and shopping planning for every user that use fridges in their home and wants to optimize food expenses and food waste. The Smart Fridge System can give easy access of all family members to many recipes to choose from and to optimize cooking by using most of the products in the fridge and to make less shopping expenses, by optimizing already bought food usage and eliminate food waste. Easily generated shopping list and easily sending it to other family members can optimize the time of shopping and expenses for cooking.
 
 Getting Started
 
