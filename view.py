@@ -6,15 +6,29 @@ from tkinter import ttk
 from PIL import Image, ImageTk
 from urllib.request import urlopen, Request
 
+from model import Item
+
 
 class View(Tk):
+    """
+    A View class that makes the interface of the application
+    """
+    # -- frame stack needed for going back --
     frame_stack = []
+    # -- predefined fonts --
     FONT2 = ('Helvetica', 12, 'bold')
     FONT3 = "Times 12 bold"
     FONT4 = "Times 14 bold"
     FONT5 = "Times 16 bold"
 
     def __init__(self, controller):
+        """
+        constructor that initialize view, make instance of controller, set min and max size of the root frame, set title
+        of the application, set geometry, make root frame and position it on screen, make and set quantity_val variable,
+        make and set date_val variable, make and set unit_var variable, perform anonymous _create_main_window function,
+        set initial sub category, perform on_start function
+        :param controller: Controller instance that connect user with view and db
+        """
         super().__init__()
         self.controller = controller
         self.minsize(width=800, height=500)
@@ -37,23 +51,19 @@ class View(Tk):
         self.sub_cat = ''
         self.on_start()
 
-    def main(self):
+    # -- main method of View class--
+    def main(self) -> None:
+        """
+        calls the mainloop function of the View class
+        """
         self.mainloop()
-        pass
 
-    def new_date(self, *args):
-        if not args:
-            new_date = date.today() + datetime.timedelta(int(str(self.date_val.get()).split(' ')[0]))
-            var = self.date_view
-            var.config(text=str(date.today() + datetime.timedelta(float(str(self.date_val.get()).split(' ')[0]))))
-            return str(new_date)
-        else:
-            c = args[0].split('-')
-            c = date(int(c[0]), int(c[1]), int(c[2]))
-            td = c - date.today()
-            return td
-
-    def _create_main_window(self):
+    # --create main view window--
+    def _create_main_window(self) -> None:
+        """
+        private method that is used when initializing view class, cannot be used outside class, created main view
+         window with every needed frames
+        """
         # ---------------wellcome------------------
         self.welcome = ttk.Label(self.root, background='grey', anchor="center", justify='center',
                                  text=f'Welcome,\n{self.controller.fridge.name}', font="Times 40 bold")
@@ -111,71 +121,262 @@ class View(Tk):
         self.columnconfigure(0, weight=1)
         self.rowconfigure(0, weight=1)
 
-    def clear_chosen(self):
+    # -- delete chosen products--
+    def clear_chosen(self) -> None:
+        """
+        delete all chosen products from view, set chosen_products variable to empty list
+        """
         self.chosen_products = []
         self.items_products_list_box.delete(0, END)
 
-    def set_chosen(self, value):
+    # -- clear fileds on recipe view --
+    def clear_used_missed_instructions(self) -> None:
+        """
+        clear chosen products list view and variable, clear ingredients view, clear recipe description view
+        """
+        self.recipe_ingredients_text.delete(1.0, 'end')
+        self.clear_chosen()
+        self.recipe_description_text.delete(1.0, 'end')
+
+    # -- check if recipe has image--
+    def check_if_chosen_recipe_image(self) -> None:
+        """
+        check if chosen recipe has image and if it has it is displayed in recipe view
+        """
+        url = self.controller.chosen_recipe.image
+        req = Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        image_bytes = urlopen(req).read()
+        data_stream = io.BytesIO(image_bytes)
+        pil_image = Image.open(data_stream)
+        global tk_image
+        tk_image = ImageTk.PhotoImage(pil_image.resize((204, 144)))
+        self.lbl = ttk.Label(self.recipe_image_box, image=tk_image, )
+        self.lbl.grid(column=0, row=0, sticky='news')
+
+    # -- make send to buttons for all of the users and one for other user--
+    def make_send_to_users_btns(self) -> None:
+        """
+        make and display send shopping list buttons for all the users in DB with their username and one for another
+         user not in DB
+        """
+        users = self.controller.db.get_all_users(self.controller.session, self.controller.fridge.id)
+        counter = 0
+        for user in users:
+            btn = ttk.Button(self.send_btn_box, text=f'Send to\n{user.username}', style='my.TButton',
+                             command=lambda mail=user.mail: self.controller.send_mail(mail))
+            btn.grid(column=counter % 4, row=counter // 4, padx=2, pady=2, sticky='news')
+            counter += 1
+        self.mail_btn_r = ttk.Button(self.send_btn_box, text='Send to', style='my.TButton',
+                                     command=lambda x='': self.controller.send_mail(x))
+        self.mail_btn_r.grid(column=counter % 4, row=counter // 4, padx=2, pady=2, sticky='news')
+
+    # -- display expired items for deleting--
+    def display_expired_for_deleting(self) -> None:
+        """
+        check if items in expired_products list and display pop up button for prompt to delete them
+        """
+        ex_pr = [x.name for x in self.controller.expired_products]
+        expired = '\n'.join(ex_pr)
+        self.pop_expired = ttk.Button(self.ask, command=self.controller.delete_expired, style='my.TButton',
+                                      text=f'EXPIRED ITEMS:\n\n\n\n{expired}\n\n\n\n\nClick to DELETE from list'
+                                           f'\n\nremove from fridge')
+        self.pop_expired.grid(column=0, columnspan=2, row=0, sticky='news', ipady=220)
+
+    # -- perform different actions on start of the application--
+    def on_start(self) -> None:
+        """
+        if user didn't set fridge's name displays settings view, else displays welcome screen for 5 sec then ask frame
+        """
+        if self.controller.fridge.name != 'Change name':
+            self.raise_above_all(self.welcome, '')
+            self.frame_stack.pop()
+            # with delay 2s
+            self.after(4000, lambda: self.raise_above_all(self.ask_frame, ''))
+            # without delay for testing
+            # self.after(0000, lambda: self.raise_above_all(self.ask_frame, ''))
+        else:
+            self.raise_above_all(self.initial, '')
+
+    # -- displays last shown frame--
+    def fall_back_under(self) -> None:
+        """
+        displays last shown frame if any and update frame stack
+        """
+        try:
+            self.controller.destroy_recipe_btn()
+        except AttributeError:
+            pass
+        self.controller.remove_from_fridge_if_any()
+        if len(self.frame_stack) > 1:
+            self.frame_stack.pop()
+            self.raise_above_all(self.frame_stack[-1], '')
+
+    # -- enable add item buttons group--
+    def enable_buttons(self) -> None:
+        """
+        enable add, update, clear, delete buttons from add item group buttons
+        """
+        self.add_btn['state'] = 'normal'
+        self.update_btn['state'] = 'normal'
+        self.clear_btn['state'] = 'normal'
+        self.del_btn['state'] = 'normal'
+
+    # -- get all item values--
+    def get_values(self) -> tuple:
+        """
+        get item values - name, amount, unit, expiry date, sub category
+        :return: tuple with all values to make Item
+        """
+        name_item = self.name_entry.get()
+        quantity = self.quantity_val.get()
+        unit = self.unit_var.get()
+        expiry_date = self.new_date()
+        sub_category = self.sub_cat
+        if unit and quantity:
+            n_quantity, n_unit = self.controller.make_unit(quantity, unit)
+            return name_item, n_quantity, n_unit, expiry_date, sub_category
+        else:
+            return name_item, quantity, unit, expiry_date, sub_category
+
+    # -- get ingredients from chosen recipe and return them as string--
+    def list_ingredients(self) -> str:
+        """
+        get all ingredients in chosen_recipe variable and returns all ingredients that have to be bought as string
+        :return: str of all ingredients in chosen_recipe variable
+        """
+        list_ingredients = []
+        for i in self.controller.chosen_recipe.ingredients:
+            for z in self.controller.ingredients_not_to_buy:
+                if i.name not in z or z not in i.name:
+                    if i.name not in list_ingredients:
+                        list_ingredients.append(i.name)
+        res = ', '.join(list_ingredients)
+        return res
+
+    # -- make new expiry date for item--
+    def new_date(self, *args) -> str:
+        """
+        make new date form current date and timedelta if not args or if args makes time delta from items expiry date
+        :param args of date as string, optional
+        :return: if args presented returns timedelta, else returns date as string
+        """
+        if not args:
+            try:
+                new_date = date.today() + datetime.timedelta(int(str(self.date_val.get()).split(' ')[0]))
+                var = self.date_view
+                var.config(text=str(date.today() + datetime.timedelta(float(str(self.date_val.get()).split(' ')[0]))))
+                return str(new_date)
+            except ValueError:
+                pass
+
+        else:
+            c = args[0].split('-')
+            c = date(int(c[0]), int(c[1]), int(c[2]))
+            td = c - date.today()
+            return str(td)
+
+    # -- set chosen items into products list box view--
+    def set_chosen(self, value: list) -> None:
+        """
+        display all chosen products in products list box view to cook for
+        :param value: list of chosen products to be displayed
+        """
         self.items_products_list_box.delete(0, END)
         for c in value:
             self.items_products_list_box.insert(END, c)
 
-    def set_choices(self, value):
+    # -- set choices for items into items list box view--
+    def set_choices(self, value: list) -> None:
+        """
+        set chosen products from list into items list box view
+        :param value: list of chosen products to be displayed into items list box view
+        """
         self.items_list_box.delete(0, END)
         for c in value:
             self.items_list_box.insert(END, c)
 
-    def set_recipes(self, value):
+    # -- set chosen recipes into recipe list box view--
+    def set_recipes(self, value: list) -> None:
+        """
+        set chosen recipes from a list into recipe list box view
+        :param value: list of chosen recipes to be displayed
+        """
         self.recipe_list_box.delete(0, END)
         for c in value:
             self.recipe_list_box.insert(END, c)
 
-    def selected_item_str(self, a):
+    # -- select item from view--
+    def selected_item_str(self, a: Event) -> None:
+        """
+        select item form fridge and return it into item fields to be removed or modified, if expired, add, update,
+         clear buttons are disabled and only delete is active to prompts user to delete item and remove it from fridge,
+         spinbox for units is modified according to item's unit
+        :param a: Event that triggers selection of item
+        """
         if a.widget.curselection() not in [(), '']:
             sel_item = self.items_list_box.get(a.widget.curselection())
             dates = []
             data = ''
             try:
                 data = self.controller.search_item(sel_item)
-                d_data = str(data.expiry)
+                d_data = str(data[0].expiry)
                 dates = d_data.split('-')
             except AttributeError:
                 pass
-            if date(int(dates[0]), int(dates[1]), int(dates[2])) < date.today():
-                self.update_btn['state'] = 'disabled'
-                self.clear_btn['state'] = 'disabled'
-                self.add_btn['state'] = 'disabled'
-            if data.unit in ['g', 'kg']:
+            try:
+                if date(int(dates[0]), int(dates[1]), int(dates[2])) <= date.today():
+                    self.update_btn['state'] = 'disabled'
+                    self.clear_btn['state'] = 'disabled'
+                    self.add_btn['state'] = 'disabled'
+                else:
+                    self.enable_buttons()
+            except ValueError:
+                pass
+            if data[0].unit in ['g', 'kg']:
                 self.units_entry['values'] = ('g', 'kg')
-            elif data.unit in ['l', 'ml']:
+            elif data[0].unit in ['l', 'ml']:
                 self.units_entry['values'] = ('ml', 'l')
             else:
                 self.units_entry['values'] = 'count'
-            self.set_values(data)
-        self.update()
+            self.set_values(data[0])
+        # self.update()
 
-    def chosen_item_str(self, b):
+    # -- select items from fridge to cook with--
+    def chosen_item_str(self, b: Event) -> None:
+        """
+        select item from fridge and add it to chosen products, remove from name any digits if any to prevent repetition
+        of items selected
+        :param b: Event that triggers selection of item
+        """
         if b.widget.curselection() not in [(), '']:
             sel_item = self.items_list_box.get(b.widget.curselection())
             if sel_item not in [(), '']:
                 data = self.controller.search_item(sel_item)
-                no_digit_name = self.controller.remove_digits(data.name)
+                no_digit_name = self.controller.remove_digits(data[0].name)
                 if no_digit_name not in self.chosen_products:
                     self.chosen_products.append(no_digit_name)
                 self.set_chosen(self.chosen_products)
 
-    def chosen_product_str(self, c):
+    # -- select products form list with chosen products to cook for--
+    def chosen_product_str(self, c: Event) -> None:
+        """
+        select product from list with chosen products to cook for and remove it from chosen_products list and update
+        chosen products view
+        :param c: Event that triggers selection of product
+        """
         if c.widget.curselection() not in [(), '']:
             sel_item = self.items_products_list_box.get(c.widget.curselection())
             self.chosen_products.remove(sel_item)
             self.set_chosen(self.chosen_products)
 
-    def clear_used_missed_instructions(self):
-        self.recipe_ingredients_text.delete(1.0, 'end')
-        self.clear_chosen()
-        self.recipe_description_text.delete(1.0, 'end')
-
-    def recipe_find(self, d):
+    # -- find selected recipe from list--
+    def recipe_find(self, d: Event) -> None:
+        """
+        select recipe name from list and then search that recipe in recipes from chosen products, random recipes or
+        favourites according to list of recipes displayed, in view displays image, ingredients, instructions and name
+        of the chosen recipe, if any
+        :param d: Event that triggers selection of recipe
+        """
         self.clear_used_missed_instructions()
         if d.widget.curselection() not in [(), '']:
             recipe_name = self.recipe_list_box.get(d.widget.curselection())
@@ -189,32 +390,26 @@ class View(Tk):
 
                     self.controller.chosen_recipe = recipe
                     list_ingredients = []
-                    for i in self.controller.chosen_recipe.ingredients:
-                        ingr = self.controller.check_ingredients_not_to_buy(i)
+                    try:
+                        for i in self.controller.chosen_recipe.ingredients:
+                            ingr = self.controller.check_ingredients_not_to_buy(i)
 
-                        if ingr and i.name not in list_ingredients:
-                            list_ingredients.append(i.name)
+                            if ingr and i.name not in list_ingredients:
+                                list_ingredients.append(i.name)
 
-                    res = ', '.join(list_ingredients)
-                    self.recipe_ingredients_text.insert(1.0, res)
-                    self.recipe_description_text.delete(1.0, 'end')
-                    if self.controller.chosen_recipe.image:
-                        url = self.controller.chosen_recipe.image
-                        req = Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-                        image_bytes = urlopen(req).read()
-                        data_stream = io.BytesIO(image_bytes)
-                        pil_image = Image.open(data_stream)
-                        global tk_image
-                        tk_image = ImageTk.PhotoImage(pil_image.resize((204, 144)))
+                        res = ', '.join(list_ingredients)
+                        self.recipe_ingredients_text.insert(1.0, res)
+                        self.recipe_description_text.delete(1.0, 'end')
+                        if self.controller.chosen_recipe.image:
+                            self.check_if_chosen_recipe_image()
 
-                        self.lbl = ttk.Label(self.recipe_image_box, image=tk_image, )
-                        self.lbl.grid(column=0, row=0, sticky='news')
-
-                    if self.controller.chosen_recipe.instructions:
-                        result = self.controller.remove_li(self.controller.chosen_recipe.instructions)
-                        self.recipe_description_text.insert(1.0, result)
-                    else:
-                        self.recipe_description_text.insert(1.0, 'Sorry! No information available')
+                        if self.controller.chosen_recipe.instructions:
+                            result = self.controller.remove_li(self.controller.chosen_recipe.instructions)
+                            self.recipe_description_text.insert(1.0, result)
+                        else:
+                            self.recipe_description_text.insert(1.0, 'Sorry! No information available')
+                    except AttributeError:
+                        pass
                 elif self.random_recipes:
                     for i in self.random_recipes:
                         if recipe_name == i.title:
@@ -253,27 +448,14 @@ class View(Tk):
             except ValueError:
                 self.chosen_products = []
 
-    def check_if_chosen_recipe_image(self):
-        url = self.controller.chosen_recipe.image
-        req = Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-        image_bytes = urlopen(req).read()
-        data_stream = io.BytesIO(image_bytes)
-        pil_image = Image.open(data_stream)
-        tk_image = ImageTk.PhotoImage(pil_image.resize((204, 144)))
-        self.lbl = ttk.Label(self.recipe_image_box, image=tk_image, )
-        self.lbl.grid(column=0, row=0, sticky='news')
-
-    def list_ingredients(self):
-        list_ingredients = []
-        for i in self.controller.chosen_recipe.ingredients:
-            for z in self.controller.ingredients_not_to_buy:
-                if i.name not in z or z not in i.name:
-                    if i.name not in list_ingredients:
-                        list_ingredients.append(i.name)
-        res = ', '.join(list_ingredients)
-        return res
-
-    def make_cook_chosen_window(self, parent):
+    # -- make cook chosen frame window--
+    def make_cook_chosen_window(self, parent: Frame) -> Frame:
+        """
+        make cook chosen view where user can select recipes and make shopping list and cook adn displays all items
+         needed
+        :param parent: Frame of the parent Frame
+        :return: currently made Frame
+        """
         cook_chosen_frame = Frame(parent, name="cook chosen")
         cook_chosen_frame.grid(column=0, row=0, sticky='news')
         self.make_menu_buttons(cook_chosen_frame, 3)
@@ -282,8 +464,8 @@ class View(Tk):
         details_box = Frame(cook_chosen_frame)
         details_box.grid(column=0, columnspan=3, row=2, sticky='news', padx=6)
         self.choices_products = []
-        choicevar = StringVar(self, value=self.choices_products, name='choicev')
-        self.items_list_box = Listbox(details_box, height=5, width=35, font=self.FONT3, listvariable=choicevar,
+        self.choicevar = StringVar(self, value=self.choices_products, name='choicev')
+        self.items_list_box = Listbox(details_box, height=5, width=35, font=self.FONT3, listvariable=self.choicevar,
                                       selectmode='browse')
         self.items_list_box.grid(column=0, row=0, sticky='news', padx=(0, 6), pady=(0, 6))
         self.items_list_box.bind('<<ListboxSelect>>', self.chosen_item_str)
@@ -370,7 +552,13 @@ class View(Tk):
         self.recipe_description_text['yscrollcommand'] = srr.set
         return cook_chosen_frame
 
-    def make_qr_shopping_list_window(self, parent):
+    # -- make qr code frame window--
+    def make_qr_shopping_list_window(self, parent: Frame) -> Frame:
+        """
+         make qr shopping list view where user can get shopping list and send it and cook and displays all items needed
+        :param parent: Frame of the parent Frame
+        :return: currently made Frame
+        """
         shopping_list_frame = Frame(parent, name="shopping list")
         shopping_list_frame.grid(column=0, row=0, sticky='news')
         shopping_list_frame.columnconfigure(0, weight=1)
@@ -394,17 +582,17 @@ class View(Tk):
         imge = PhotoImage(file='')
         self.label_qr = Label(self.right_box, image=imge)
         self.label_qr.grid(column=0, columnspan=2, row=0, sticky='s')
-        self.clear_shopping_list_btn = Button(self.right_box, text='Clear\nShopping List', font="Helvetica 12 bold",
+        self.clear_shopping_list_btn = Button(self.right_box, text='Close App', font="Helvetica 12 bold",
                                               background='#EC7063',
-                                              command=self.controller.clear_shopping_list)
-        self.clear_shopping_list_btn.grid(column=0, row=1, ipadx=12, padx=(0, 6), pady=6)
+                                              command=self.controller.close_app)
+        self.clear_shopping_list_btn.grid(column=0, row=1, ipadx=8, padx=(1, 2), pady=2, ipady=9, sticky='news')
         self.continue_shopping_btn = Button(self.right_box, text='Continue\nShopping', font="Helvetica 12 bold",
                                             background='#AED6F1',
                                             command=self.fall_back_under)
         self.continue_shopping_btn.grid(column=1, row=1, ipadx=12)
         self.remove_from_fridge_cook_btn = Button(self.right_box, text='COOK', font="Helvetica 12 bold",
                                                   background='#A9DFBF',
-                                                  command=self.controller.remove_from_fridge_if_any)
+                                                  command=self.controller.show_recipe)
         self.remove_from_fridge_cook_btn.grid(column=0, columnspan=2, row=2, sticky='news', ipady=50)
         self.shopping_list_title = ttk.Label(self.left_box, text='SHOPPING LIST', font=self.FONT4,
                                              justify='center', )
@@ -417,34 +605,31 @@ class View(Tk):
         self.shopping_list_content.grid(column=0, row=1, sticky='news', padx=(28, 18))
         self.shopping_list_content2 = ttk.Label(self.inner_left_box, font=('bold', 14))
         self.shopping_list_content2.grid(column=2, row=1, sticky='news', padx=18)
-        users = self.controller.db.get_all_users(self.controller.session, self.controller.fridge.id)
         self.send_btn_box = ttk.Label(self.left_box, justify='center')
         self.send_btn_box.grid(column=0, columnspan=2, row=2, sticky='n', padx=(0, 2))
-        counter = 0
-        for user in users:
-            btn = ttk.Button(self.send_btn_box, text=f'Send to\n{user.username}', style='my.TButton',
-                             command=lambda mail=user.mail: self.controller.send_mail(mail))
-            btn.grid(column=counter % 4, row=counter // 4, padx=2, pady=2, sticky='news')
-            counter += 1
-        self.mail_btn_r = ttk.Button(self.send_btn_box, text='Send to', style='my.TButton',
-                                     command=lambda x='': self.controller.send_mail(x))
-        self.mail_btn_r.grid(column=counter % 4, row=counter // 4, padx=2, pady=2, sticky='news')
         return shopping_list_frame
 
-    def make_cook_window(self, parent):
+    # -- make cook frame window --
+    def make_cook_window(self, parent: Frame) -> Frame:
+        """
+         make sub cook frame where user to choose where to get recipes from, make recipe from items in fridge, get
+         random recipe, or choose among favourite resipes, if any and displays all needed items
+        :param parent: Frame of the parent Frame
+        :return: currently made Frame
+        """
         cook_frame = Frame(parent, name='cook_frame')
         cook_frame.grid(column=0, row=0, sticky='news')
         self.make_menu_buttons(cook_frame, 1)
         image1 = Image.open('images/add-to-favorites-icon.png')
-        image1 = image1.resize((50, 50), Image.ANTIALIAS)
+        image1 = image1.resize((50, 50))
         global img1
         img1 = ImageTk.PhotoImage(image1)
         image2 = Image.open('images/pngegg.png')
-        image2 = image2.resize((130, 110), Image.ANTIALIAS)
+        image2 = image2.resize((130, 110))
         global img2
         img2 = ImageTk.PhotoImage(image2)
         image3 = Image.open('images/choose-icon.png')
-        image3 = image3.resize((90, 70), Image.ANTIALIAS)
+        image3 = image3.resize((90, 70))
         global img3
         img3 = ImageTk.PhotoImage(image3)
         random_btn = Button(cook_frame, text='           F A V O U R I T E S', image=img1, compound=LEFT,
@@ -464,7 +649,13 @@ class View(Tk):
         choose_btn.grid(column=0, columnspan=3, row=3, sticky='new', ipady=5)
         return cook_frame
 
-    def make_add_item_window(self, parent):
+    # -- make add item to fridge view window--
+    def make_add_item_window(self, parent: Frame) -> Frame:
+        """
+         make add item frame with where user can add, update, delete items and displays all items in fridge
+        :param parent: Frame of the parent Frame
+        :return: currently made Frame
+        """
         add_item_frame = Frame(parent, name="add items")
         add_item_frame.grid(column=0, row=0, sticky='news')
         try:
@@ -477,11 +668,11 @@ class View(Tk):
         self.under_menu_frame.grid(column=0, columnspan=3, row=1, sticky='news', padx=6)
         self.under_menu_frame.columnconfigure(0, weight=1)
         self.under_menu_frame.rowconfigure(0, weight=1)
-        choicevar = StringVar(self, value=self.choices, name='choicev', )
+        self.choicevar = StringVar(self, value=self.choices, name='choicev', )
         self.listbox_name = ttk.Label(self.under_menu_frame, text='PRODUCTS IN FRIDGE', font=self.FONT5,
                                       justify='center')
         self.listbox_name.grid(column=0, columnspan=4, row=1, sticky='n', pady=(0, 38))
-        self.items_list_box = Listbox(self.under_menu_frame, height=15, listvariable=choicevar, selectmode='browse',
+        self.items_list_box = Listbox(self.under_menu_frame, height=15, listvariable=self.choicevar, selectmode='browse',
                                       width=37, font=self.FONT5)
         self.items_list_box.grid(column=0, row=2, sticky='e', padx=(4, 0), pady=(0, 12))
         self.items_list_box.bind('<<ListboxSelect>>', self.selected_item_str)
@@ -535,7 +726,13 @@ class View(Tk):
         self.alpha_box.grid(column=0, row=0, sticky='s', pady=(32, 0))
         return add_item_frame
 
-    def make_add_window(self, parent):
+    # -- make add item by sub category--
+    def make_add_window(self, parent: Frame) -> Frame:
+        """
+         make buttons for all the sub categories so user can place new item in correct sub category
+        :param parent: Frame of the parent Frame
+        :return: currently made Frame
+        """
         add_frame = ttk.Frame(parent, name='others')
         add_frame.grid(column=0, row=0, sticky='news')
         global fruit
@@ -593,7 +790,13 @@ class View(Tk):
         others.grid(column=2, row=3, sticky='news', ipadx=6)
         return add_frame
 
-    def make_aks_window(self, parent):
+    # -- make ask view window--
+    def make_aks_window(self, parent: Frame) -> Frame:
+        """
+        make ask view frame when user is asked to choose if to add item or to cook and display these 2 buttons
+        :param parent: Frame of the parent Frame
+        :return: currently made Frame
+        """
         global bag
         bag = PhotoImage(file='images/bag1.png')
         global chef
@@ -618,15 +821,14 @@ class View(Tk):
             self.display_expired_for_deleting()
         return self.ask
 
-    def display_expired_for_deleting(self):
-        ex_pr = [x.name for x in self.controller.expired_products]
-        expired = '\n'.join(ex_pr)
-        self.pop_expired = ttk.Button(self.ask, command=self.controller.delete_expired, style='my.TButton',
-                                      text=f'EXPIRED ITEMS:\n\n\n\n{expired}\n\n\n\n\nClick to DELETE from list'
-                                           f'\n\nremove from fridge')
-        self.pop_expired.grid(column=0, columnspan=2, row=0, sticky='news', ipady=220)
-
-    def make_initial_window(self, parent, *args):
+    # -- make initial view frame to set fridge name and users--
+    def make_initial_window(self, parent: Frame, *args) -> Frame:
+        """
+        make initial settings frame where user can set or change fridge's name and add, update or remove users and all
+         needed items to display
+        :param parent: Frame of the parent Frame
+        :return: currently made Frame
+        """
         s = ttk.Style()
         s.configure('my.TButton', font=self.FONT2, justify="center", background='orange')
         if self.controller.fridge.name == 'Change name' or args:
@@ -702,7 +904,13 @@ class View(Tk):
         else:
             return self.on_start()
 
-    def make_user_field_lines(self, index):
+    # -- make user fields and buttons--
+    def make_user_field_lines(self, index: int) -> tuple:
+        """
+        make all needed fields to be displayed for user to be created and buttons to be updated or deleted
+        :param index: int place of the user in the view
+        :return: tuple with all of users fields that have to be displayed
+        """
         return ttk.Label(self.initial_box, text='User: ', font=('Helvetica', 12)), \
                ttk.Entry(self.initial_box, font=('Helvetica', 12)), \
                ttk.Label(self.initial_box, text="e-mail: ", font=('Helvetica', 12)), \
@@ -712,7 +920,14 @@ class View(Tk):
                Button(self.initial_box, text='DELETE', foreground='white', background='red',
                       font=('Helvetica', 8, 'bold'), command=lambda x=index: self.controller.delete_user(x))
 
-    def make_menu_buttons(self, parent, colspan, *name_sub):
+    # -- make menu buttons--
+    def make_menu_buttons(self, parent: Frame, colspan: int, *name_sub) -> None:
+        """
+        make menu buttons for most of the frames and place them, buttons are: add, cook, back
+        :param parent: parent Frame where current frame to be places
+        :param colspan: int number of columns to span
+        :param name_sub: optional, name of frame
+        """
         home_sub_menu = Frame(parent)
         home_sub_menu.grid(column=0, row=0, sticky='wn')
         home_sub_menu.columnconfigure(0, weight=1)
@@ -728,20 +943,17 @@ class View(Tk):
                            command=self.fall_back_under, background='#163c5e', font="Times 16 italic bold")
         back_menu.grid(column=2, row=0, sticky='ne')
 
-    def on_start(self):
-        if self.controller.fridge.name != 'Change name':
-            self.raise_above_all(self.welcome, '')
-            self.frame_stack.pop()
-            # with delay 2s
-            self.after(5000, lambda: self.raise_above_all(self.ask_frame, ''))
-            # without delay for testing
-            # self.after(0000, lambda: self.raise_above_all(self.ask_frame, ''))
-        else:
-            self.raise_above_all(self.initial, '')
-
-    def raise_above_all(self, win1, action):
+    # -- raise specific frame above others--
+    def raise_above_all(self, win1: Frame, action: str) -> None:
+        """
+        display selected frame or if setting button pressed display settings window,
+        clear specific fields according to keyword and if selected frame is the initial frame clears frame stack
+        :param win1: view frame to be lifted
+        :param action: keyword that can modify lifting behaviour
+        """
         if win1 == self.ask_frame and self.controller.wait:
             try:
+                self.make_initial_window(self.root, True)
                 self.initial.lift()
             except AttributeError:
                 pass
@@ -756,7 +968,7 @@ class View(Tk):
             self.sub_cat = action
             if self.sub_cat == 'random':
                 self.clear_used_missed_instructions()
-                self.random_recipes = self.controller.get_random_recipes()
+                self.random_recipes = self.controller.get_random_recipes(10)
                 self.set_recipes(self.random_recipes)
             elif self.sub_cat == 'favourite':
                 self.clear_used_missed_instructions()
@@ -771,12 +983,12 @@ class View(Tk):
             self.middle_menu_label.config(text=self.sub_cat)
             self.set_values()
 
-    def fall_back_under(self):
-        if len(self.frame_stack) > 1:
-            self.frame_stack.pop()
-            self.raise_above_all(self.frame_stack[-1], '')
-
-    def set_values(self, *args):
+    # -- set values for add item frame--
+    def set_values(self, *args: Item) -> None:
+        """
+        set initial values in item fields if args not presented, else set values from args in item fields
+        :param args: list if args set values of item with values of the selected item placed in args
+        """
         if not args:
             self.quantity_val.set('')
             self.date_val.set('1')
@@ -797,21 +1009,3 @@ class View(Tk):
             self.date_val.set(self.new_date(data.expiry))
             self.name_entry.delete(0, END)
             self.name_entry.insert(0, data.name)
-
-    def get_values(self):
-        name_item = self.name_entry.get()
-        quantity = self.quantity_val.get()
-        unit = self.unit_var.get()
-        expiry_date = self.new_date()
-        sub_category = self.sub_cat
-        if unit and quantity:
-            n_quantity, n_unit = self.controller.make_unit(quantity, unit)
-            return name_item, n_quantity, n_unit, expiry_date, sub_category
-        else:
-            return name_item, quantity, unit, expiry_date, sub_category
-
-    def enable_buttons(self):
-        self.add_btn['state'] = 'normal'
-        self.update_btn['state'] = 'normal'
-        self.clear_btn['state'] = 'normal'
-        self.del_btn['state'] = 'normal'
