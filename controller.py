@@ -1,5 +1,4 @@
 import math
-import string
 import time
 from datetime import date
 import os
@@ -35,8 +34,8 @@ class Controller:
         chosen_recipe variable
         """
         load_dotenv()
-        env = os.getenv('api_keys1')
-        self.api_keys = env
+        self.env = os.getenv('api_keys1')
+        self.api_keys = self.env
         self.ingredients_not_to_buy = ['water', 'salt', 'table salt', 'salt and pepper', 'flour', 'half and half',
                                        'pepper', 'sugar', 'salt & pepper', 'cooking oil']
 
@@ -44,20 +43,29 @@ class Controller:
         Base.metadata.create_all(self.engine)
         self.session = Session(self.engine)
         self.db = DataBase
-        self.fridge = self.session.get(Fridge, 1)
-        if self.fridge is None:
-            self.db.make_fridge(self.session, 'Change name')
-            self.fridge = self.session.get(Fridge, 1)
+        self.fridge = self.set_fridge_object()
         self.expired_products = []
         self.check_for_expired_products()
         self.remove_from_fridge_if_any()
         self.wait = False
         self.view = View(self)
         self.generate_choices()
-        self.last_item = ''
+        self.last_item = []
         self.recipes = []
         self.chosen_recipe = Recipe
         self.recipes_for_cooking = []
+
+    # -- set fridge object --
+    def set_fridge_object(self) -> type[Fridge]:
+        """
+        get Fridge object from DB
+        :return: Fridge object
+        """
+        self.fridge = self.session.get(Fridge, 1)
+        if self.fridge is None:
+            self.db.make_fridge(self.session, 'Change name')
+            self.fridge = self.session.get(Fridge, 1)
+        return self.fridge
 
     # -- remove digits from items name --
     @staticmethod
@@ -97,13 +105,9 @@ class Controller:
         :returns string with instructions without html tags
         """
         if instructions:
-            i = instructions.replace('<ol>', '')
-            i1 = i.replace('<li>', '')
-            i2 = i1.replace('<p>', '')
-            i3 = i2.replace('</p>', '\n')
-            i4 = i3.replace('</li>', '\n')
-            i5 = i4.replace('</ol>', '\n')
-            return i5
+            i = instructions.replace('<ol>', '').replace('<li>', '').replace('<p>', '').replace('</p>', '\n')\
+                .replace('</p>', '\n').replace('</li>', '\n').replace('</ol>', '\n')
+            return i
         else:
             return instructions
 
@@ -115,14 +119,11 @@ class Controller:
         :param list_chosen_ingr: list chosen ingredients as list
         :returns string of the ingredients as needed to make proper query to API
         """
-        if len(list_chosen_ingr) == 0:
-            pass
-        to_str_chosen_ingr = ',+'.join(list_chosen_ingr)
-        return to_str_chosen_ingr
+        return ',+'.join(list_chosen_ingr)
 
     # -- choose shorter name of the ingredient --
     @staticmethod
-    def check_name_len(name1: str, name2: str) -> str:
+    def check_name_len(name1: str, *name2: str) -> str:
         """
         choose shorter name form the API of the ingredient
         :param name1: str one of the names taken from the API
@@ -130,10 +131,10 @@ class Controller:
         :returns string of the ingredients'  shorter name
         """
         len_name1 = name1.split(' ')
-        if name2:
-            len_name2 = name2.split(' ')
+        if name2[0]:
+            len_name2 = name2[0].split(' ')
             if len_name1 > len_name2:
-                return name2
+                return name2[0]
         return name1
 
     # -- make amount and unit that user can work easily with --
@@ -180,7 +181,8 @@ class Controller:
         elif unit in ['ounces', 'ounce', 'Ounces', 'Ounce']:
             new_amount = int(round(float(amount) * 28, 0))
             new_unit = 'g'
-        elif unit in ['', 'serving', 'servings', 'extra large', 'large', 'large bunch', 'cloves', 'can', 'cans', 'bunch', 'small',
+        elif unit in ['', 'serving', 'servings', 'extra large', 'large', 'large bunch', 'cloves', 'can', 'cans',
+                      'bunch', 'small',
                       'medium', 'pinch', 'pkg', 'stalks', 'inch', 'inches', 'fillet', 'clove', 'small bunch', 'Bunch',
                       'loaf', 'large clove', 'leaf', 'Clove', 'head', 'pinches', 'large can', 'sprig', 'handfuls',
                       'strips', 'Cloves', 'strip', 'Handful', 'Handfuls', 'handful', 'medium size', 'pkt', 'sprigs']:
@@ -295,24 +297,6 @@ class Controller:
                     column=1, row=counter - 8, sticky='ens', padx=6)
             counter += 1
 
-    # -- clear shopping list view and shopping variable --
-    def clear_shopping_list(self) -> None:
-        """
-        clear shopping variable from ingredients to buy and remove them from the shopping list view, also reset info for
-        qr code
-        """
-        a = self.view.shopping_list_content.winfo_children()
-        b = self.view.shopping_list_content2.winfo_children()
-        for i in a:
-            i.destroy()
-        for i in b:
-            i.destroy()
-        self.view.shopping = []
-        self.data = 'Shopping List:\nno chosen products'
-
-        qr = self.make_qr_code(self.data)
-        self.view.label_qr.config(image=qr)
-
     # -- removes pop up button --
     def destroy_top_btn(self) -> None:
         """
@@ -330,36 +314,13 @@ class Controller:
             self.db.delete_item_from_fridge(self.session, item)
         self.view.pop_expired.destroy()
 
-    # -- name of users' fields --
-    def name_buttons(self) -> list:
-        """
-        only
-        :returns list with names of all users' fields used for proper user manipulation
-        """
-        return [
-            [self.view.first_user_label, self.view.first_user_entry, self.view.first_user_mail,
-             self.view.first_user_mail_entry, self.view.update_first_user, self.view.delete_first_user, ],
-            [self.view.sec_user_label, self.view.sec_user_entry, self.view.sec_user_mail,
-             self.view.sec_user_mail_entry, self.view.update_sec_user, self.view.delete_sec_user, ],
-            [self.view.third_user_label, self.view.third_user_entry, self.view.third_user_mail,
-             self.view.third_user_mail_entry, self.view.update_third_user, self.view.delete_third_user, ],
-            [self.view.four_user_label, self.view.four_user_entry, self.view.four_user_mail,
-             self.view.four_user_mail_entry, self.view.update_four_user, self.view.delete_four_user, ],
-            [self.view.fifth_user_label, self.view.fifth_user_entry, self.view.fifth_user_mail,
-             self.view.fifth_user_mail_entry, self.view.update_fifth_user, self.view.delete_fifth_user, ],
-            [self.view.sixth_user_label, self.view.sixth_user_entry, self.view.sixth_user_mail,
-             self.view.sixth_user_mail_entry, self.view.update_sixth_user, self.view.delete_sixth_user, ],
-            [self.view.sev_user_label, self.view.sev_user_entry, self.view.sev_user_mail,
-             self.view.sev_user_mail_entry, self.view.update_sev_user, self.view.delete_sev_user, ],
-        ]
-
     # -- add new user into DB and view --
     def add_new_user(self) -> None:
         """
         add new user in DB if there are filled fields of name and email and display it in the view in empty location
          field
         """
-        name_btns = self.name_buttons()
+        name_btns = self.view.name_buttons()
         try:
             for i in range(0, 7):
                 u_u = name_btns[i][1].get()
@@ -382,7 +343,7 @@ class Controller:
         """
         clear all fields from add item in fridge view and resets connected variables
         """
-        self.last_item = ''
+        self.last_item = []
         self.view.set_values()
         self.generate_choices()
         self.view.enable_buttons()
@@ -396,10 +357,14 @@ class Controller:
         """
         destroy recipe and ingredients pop up from view
         """
-        self.pop2.destroy()
-        self.pop3.destroy()
-        self.tex_scroll2.destroy()
-        self.tex_scroll3.destroy()
+        try:
+            self.pop2.destroy()
+            self.top_recipe_buttons_frame.destroy()
+            self.pop3.destroy()
+            self.tex_scroll2.destroy()
+            self.tex_scroll3.destroy()
+        except AttributeError:
+            pass
 
     # -- close the app --
     def close_app(self) -> None:
@@ -408,21 +373,26 @@ class Controller:
         """
         self.view.quit()
 
-    # -- show recipe and ingredients as pop ups --
+    # -- show recipe and ingredients as pop-ups --
     def show_recipe(self) -> None:
         """
-        display recipe and ingredients in the view as pop ups for easy cooking
+        display recipe and ingredients in the view as pop-ups for easy cooking
         """
-        result = self.remove_li(self.chosen_recipe.instructions)
-        self.pop2 = Text(self.view.shopping_list_frame, wrap='word', font=('Times', 20, 'bold'))
-        self.pop2.delete('1.0', END)
-        self.pop2.insert(END, result)
-        self.tex_scroll2 = Scrollbar(self.view.shopping_list_frame, orient=VERTICAL, )
-        self.tex_scroll2.config(command=self.pop2.yview, )
-        self.pop2["yscrollcommand"] = self.tex_scroll2.set
-        self.tex_scroll2.grid(column=0, row=0, rowspan=6, sticky="nes", pady=(45, 0))
+        self.view.shopping_list_title.grid_forget()
+        result = self.remove_li(self.recipes_for_cooking[0].instructions)
+        new_result = self.prepare_text_for_display(result, 49)
+
+        self.pop2 = Frame(self.view.shopping_list_frame)
         self.pop2.grid(column=0, row=0, rowspan=6, sticky='news', padx=(5, 20), pady=(45, 0))
-        result2 = [(x.name, x.amount, x.unit) for x in self.chosen_recipe.ingredients]
+        self.text2 = Text(self.pop2, wrap=WORD, font=('Times', 18, 'bold'))
+        self.text2.delete('1.0', END)
+        self.text2.insert(END, new_result)
+        self.tex_scroll2 = Scrollbar(self.view.shopping_list_frame, orient=VERTICAL, )
+        self.tex_scroll2.config(command=self.text2.yview, )
+        self.text2["yscrollcommand"] = self.tex_scroll2.set
+        self.tex_scroll2.grid(column=0, row=1, rowspan=6, sticky="nes", pady=(45, 0))
+        self.text2.grid(column=0, row=1, sticky='news')
+        result2 = [(x.name, x.amount, x.unit) for x in self.recipes_for_cooking[0].ingredients]
         self.pop3 = Text(self.view.right_box, wrap='word', font=('Times', 10, 'bold'), width=35, height=17)
         self.pop3.delete('1.0', END)
         for ingr in result2:
@@ -432,6 +402,62 @@ class Controller:
         self.pop3["yscrollcommand"] = self.tex_scroll3.set
         self.tex_scroll3.grid(column=0, columnspan=2, row=0, sticky="nes", pady=(0, 2))
         self.pop3.grid(column=0, columnspan=2, row=0, sticky='news', pady=(0, 2))
+        self.top_recipe_buttons_frame = Frame(self.pop2)
+        self.top_recipe_buttons_frame.grid(column=0, row=0, sticky='news')
+        self.recipe_btns = []
+        width_btn = int(71 / len(self.recipes_for_cooking))
+        len_text = int(87 / len(self.recipes_for_cooking))
+        for recipe in range(len(self.recipes_for_cooking)):
+            self.btn = Button(self.top_recipe_buttons_frame, text=self.recipes_for_cooking[recipe].title[:len_text],
+                              justify=LEFT, command=lambda x=recipe: self.set_recipe(x), width=width_btn)
+            self.btn.grid(column=recipe, row=0, ipadx=0)
+            self.recipe_btns.append(self.btn)
+        self.recipe_btns[0].config(background='lightgray')
+
+    # -- prepare text for inserting into text box to be visible for user
+    @staticmethod
+    def prepare_text_for_display(text: str, symbols: int) -> str:
+        """
+        prepare text for inserting into text box by placing words, so they can all be visible by the user
+        :param text: str text of the recipe to be formatted, so it can be properly displayed on the screen
+        :param symbols: int number of symbols to be displayed in one row, this value depends on the font of the text
+        and width of the text filed
+        :return: str with formatted text
+        """
+        text = text.replace('\n', ' ')
+        list_of_words = text.split(' ')
+        join_words_to_49_chars = []
+        temp_word_old = ''
+        temp_word_new = ""
+        for word in list_of_words:
+            temp_word_new += word + ' '
+            if len(temp_word_new) < symbols:
+                temp_word_old += word + ' '
+                if word == list_of_words[-1]:
+                    join_words_to_49_chars.append(temp_word_old)
+            else:
+                join_words_to_49_chars.append(temp_word_old)
+                temp_word_new = word + ' '
+                temp_word_old = word + ' '
+        return '\n'.join(join_words_to_49_chars)
+
+    # -- set recipe data for cookind according to chosen recipe button
+    def set_recipe(self, index_of_recipe: int = 0) -> None:
+        """
+        set recipe data for cooking according to chosen recipe button
+        :param index_of_recipe: int default value = 0, index of the recipe in the list of chosen recipes
+        """
+        for btn in self.recipe_btns:
+            btn.config(background='white')
+        self.recipe_btns[index_of_recipe].config(background='lightgray')
+        result = self.remove_li(self.recipes_for_cooking[index_of_recipe].instructions)
+        new_result = self.prepare_text_for_display(result, 49)
+        self.text2.delete('1.0', END)
+        self.text2.insert(END, new_result)
+        result2 = [(x.name, x.amount, x.unit) for x in self.recipes_for_cooking[index_of_recipe].ingredients]
+        self.pop3.delete('1.0', END)
+        for ingr in result2:
+            self.pop3.insert(END, f'{ingr[0]} - {ingr[1]} {ingr[2]}\n')
 
     # -- remove zero or small amount items from fridge --
     def remove_from_fridge_if_any(self) -> None:
@@ -465,11 +491,24 @@ class Controller:
                 list_ids.append(result['id'])
             list_recipes = self.get_bulk_recipes_by_ids(list_ids)
             return list_recipes
+        else:
+            self.change_api_key()
+
+    # -- change with next api key --
+    def change_api_key(self) -> None:
+        """
+        change api key from the env file
+        """
+        keys = ['api_keys', 'api_keys1', 'api_keys2', 'api_keys3']
+        new_api_key = keys[0]
+        self.env = os.getenv(new_api_key)
+        keys.remove(new_api_key)
+        keys.append(new_api_key)
 
     # -- get random recipes from the API--
     def get_random_recipes(self, number: int) -> list:
         """
-        get random recipes from API, makes a recipe object with all of the recipe's
+        get random recipes from API, makes a recipe object with all the recipe's
          information and add it to a list
         :param number: int number of recipes to be taken
         :returns list of recipes object with information of each recipe
@@ -506,6 +545,8 @@ class Controller:
                                 recipe.ingredients.append(ingredient)
                 recipes.append(recipe)
             return recipes
+        else:
+            self.change_api_key()
 
     # -- set choices variable with all the items in the fridge --
     def generate_choices(self, *args) -> None:
@@ -552,19 +593,22 @@ class Controller:
         response = requests.get(url)
         results = response.json()
         recipes = []
-        for r in results:
-            rr_id = r['id']
-            r_name = r['title']
-            r_ingredients = r["extendedIngredients"]
-            r_image = ''
-            try:
-                r_image = r['image']
-            except KeyError:
-                pass
-            r_instructions = r['instructions']
-            recipe = self.create_recipe(rr_id, r_name, r_image, r_instructions, r_ingredients)
-            recipes.append(recipe)
-        return recipes
+        if response.status_code < 400:
+            for r in results:
+                rr_id = r['id']
+                r_name = r['title']
+                r_ingredients = r["extendedIngredients"]
+                r_image = ''
+                try:
+                    r_image = r['image']
+                except KeyError:
+                    pass
+                r_instructions = r['instructions']
+                recipe = self.create_recipe(rr_id, r_name, r_image, r_instructions, r_ingredients)
+                recipes.append(recipe)
+            return recipes
+        else:
+            self.change_api_key()
 
     # -- create recipe object --
     def create_recipe(self, r_id: int, r_name: str, r_image: str, r_instructions: str, r_ingredients: list) -> Recipe:
@@ -609,7 +653,7 @@ class Controller:
         :param command: str to be places into wait variable
         """
         self.wait = command
-        time.sleep(5)
+        time.sleep(2)
         self.view.initial = self.view.make_initial_window(self.view.root, command)
 
     # -- take pressed letter and placed it in a field or make action --
@@ -630,31 +674,6 @@ class Controller:
             ltr = ''
         self.view.name_entry.insert(END, ltr)
         self.view.name_entry.focus()
-
-    # -- make keyboard in the view --
-    def make_letter_buttons(self, parent: Frame) -> None:
-        """
-        make keyboard buttons in specific frame and every button returns letter of calls function
-        :param parent: Frame where the keyboard to be displayed in
-        """
-        inner_counter = 0
-        for i in string.ascii_lowercase:
-            Button(parent, text=i, command=lambda ltr=i: self.handle_letter(ltr), width=3, background='#EBF5FB',
-                   foreground='#212F3D', font=('Helvetica', 12, 'bold')) \
-                .grid(column=(inner_counter % 10), row=inner_counter // 10, sticky='news', padx=2, pady=2)
-            inner_counter += 1
-        Button(parent, text='DELETE', command=lambda ltr='del': self.handle_letter(ltr), background='#F9EBEA',
-               foreground='#212F3D', font=('Helvetica', 12, 'bold')) \
-            .grid(column=inner_counter % 10, row=inner_counter // 10, sticky='news', padx=2, pady=2,
-                  columnspan=10 - ((inner_counter - 1) % 10))
-        inner_counter += 1
-        Button(parent, text='SPACE', command=lambda ltr='space': self.handle_letter(ltr), background='#FEF9E7',
-               foreground='#212F3D', font=('Helvetica', 12, 'bold')) \
-            .grid(column=0, row=(inner_counter // 10) + 1, columnspan=10, sticky='news', padx=2, pady=2)
-        inner_counter += 1
-        Button(parent, text='ENTER', command=lambda ltr='enter': self.handle_letter(ltr), background='#E9F7EF',
-               foreground='#212F3D', font=('Helvetica', 12, 'bold')) \
-            .grid(column=0, row=(inner_counter // 10) + 2, columnspan=10, sticky='news', padx=2, pady=2, ipady=12)
 
     # -- search item from db --
     def search_item(self, name_item: str) -> list:
@@ -749,11 +768,13 @@ class Controller:
                 self.view.recipe_description_text.insert(1.0, 'Sorry! No favourite recipes available!\n'
                                                               'Add favourite recipes first!')
         elif action == 'shopping_list':
+            self.destroy_recipe_btn()
             self.remove_from_fridge_if_any()
             self.view.make_send_to_users_btns()
             self.data = 'Shopping List:\nno chosen products'
             if self.chosen_recipe:
-                self.recipes_for_cooking.append(self.chosen_recipe)
+                if self.chosen_recipe not in self.recipes_for_cooking:
+                    self.recipes_for_cooking.append(self.chosen_recipe)
                 for ingred in self.chosen_recipe.ingredients:
                     if ingred:
                         item = self.check_if_ingredient_is_in_fridge(ingred)
@@ -768,7 +789,7 @@ class Controller:
             self.view.label_qr.config(image=qr)
             self.view.raise_above_all(self.view.shopping_list_frame, '')
         elif action == 'get_shopping_list':
-
+            self.destroy_recipe_btn()
             self.view.make_send_to_users_btns()
             self.data = 'Shopping List:\nno chosen products'
             if self.view.shopping:
@@ -837,7 +858,7 @@ class Controller:
             elif sel_unit == units[4]:
                 self.view.quantity_entry.config(from_=data[units[4]][0], to=data[units[4]][1],
                                                 increment=data[units[4]][2])
-            self.view.quantity_entry['state'] = 'active'
+            self.view.quantity_entry['state'] = 'readonly'
         else:
             if sel_unit in ['ml', 'g']:
                 value = int(float(current_value) * 1000)
@@ -888,7 +909,7 @@ class Controller:
         delete user from specific position in the view and delete user from the DB
         :param position: int position of the user in view
         """
-        name_btns = self.name_buttons()
+        name_btns = self.view.name_buttons()
         all_users = self.db.get_all_users(self.session, self.fridge.id)
 
         name_btns[position][0].grid_forget()
@@ -910,7 +931,7 @@ class Controller:
         update user info in specific position in the view and update user's info in DB
         :param position: in t position of the user in the view
         """
-        name_btns = self.name_buttons()
+        name_btns = self.view.name_buttons()
         all_users = self.db.get_all_users(self.session, self.fridge.id)
         for u in range(len(all_users)):
             if u == position:
@@ -919,13 +940,13 @@ class Controller:
                 self.session.commit()
 
     # -- check if ingredient is in fridge and can be used --
-    def check_if_ingredient_is_in_fridge(self, ingredient: Ingredient) -> None:
+    def check_if_ingredient_is_in_fridge(self, ingredient: Ingredient) -> Ingredient:
         """
         check if ingredient is in fridge, if in fridge and amount is enough for the recipe, the food item in fridge is
         updated with removed amount needed for the recipe, else ingredient is not removed from shopping list
         :param ingredient: Ingredient needed to prepare the recipe
+        :return Ingredient
         """
-        # modified_amount = False
         return_product = True
         ingredient_to_manipulate = Ingredient(name=ingredient.name, amount=ingredient.amount, unit=ingredient.unit,
                                               recipe_id=ingredient.recipe_id)
@@ -944,18 +965,16 @@ class Controller:
 
                     new_amount_ingr = 0
                     ingredient_to_manipulate.amount = new_amount_ingr
-                    # modified_amount = True
                     return_product = False
                 else:
                     new_amount_ingr = float(ingredient_to_manipulate.amount) - float(item.amount)
                     ingredient_to_manipulate.amount = new_amount_ingr
                     new_amount_item = 0
-                    self.db.set_data_for_item_from_name(self.session, item.name, item.name, int(new_amount_item), item.unit,
+                    self.db.set_data_for_item_from_name(self.session, item.name, item.name, int(new_amount_item),
+                                                        item.unit,
                                                         item.expiry, item.sub_category)
-                    # return item
         if return_product:
             return ingredient_to_manipulate
-
 
     # -- check if ingredient is in shopping variable --
     def check_if_ingredient_is_shopping_list(self, ingredient: Ingredient) -> Ingredient:
@@ -975,17 +994,6 @@ class Controller:
             return ingredient
         else:
             return ingredient
-
-    # -- check if item is expired --
-    def check_if_item_in_expired(self, name: str) -> bool:
-        """
-        check if searched item is in the expired_products variable and return status
-        :param name: str name of the food item to be checked if it is expired
-        :return: bool value, True if not in expired_products list else False
-        """
-        if name in self.expired_products:
-            return False
-        return True
 
     # -- group of buttons that act different according to keyword --
     def item_action_buttons(self, action: str) -> None:
@@ -1007,7 +1015,7 @@ class Controller:
                         item = Item(name=new_name, amount=n_quantity, unit=n_unit, expiry=str(n_expiry_date),
                                     sub_category_id=self.db.get_sub_id(self.session, sub_category),
                                     fridge_id=self.fridge.id)
-                        self.last_item = item
+                        self.last_item = [item]
                         self.db.add_item_to_fridge(self.session, item)
                     else:
                         self.db.set_data_for_item_from_name(self.session, last_checked_name, new_name, n_quantity,

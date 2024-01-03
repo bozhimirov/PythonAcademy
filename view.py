@@ -1,11 +1,11 @@
 import datetime
 import io
+import string
 from datetime import date
 from tkinter import *
 from tkinter import ttk
 from PIL import Image, ImageTk
 from urllib.request import urlopen, Request
-
 from model import Item
 
 
@@ -129,7 +129,7 @@ class View(Tk):
         self.chosen_products = []
         self.items_products_list_box.delete(0, END)
 
-    # -- clear fileds on recipe view --
+    # -- clear fields on recipe view --
     def clear_used_missed_instructions(self) -> None:
         """
         clear chosen products list view and variable, clear ingredients view, clear recipe description view
@@ -153,7 +153,7 @@ class View(Tk):
         self.lbl = ttk.Label(self.recipe_image_box, image=tk_image, )
         self.lbl.grid(column=0, row=0, sticky='news')
 
-    # -- make send to buttons for all of the users and one for other user--
+    # -- make send to buttons for all the users and one for other user--
     def make_send_to_users_btns(self) -> None:
         """
         make and display send shopping list buttons for all the users in DB with their username and one for another
@@ -316,7 +316,7 @@ class View(Tk):
         if a.widget.curselection() not in [(), '']:
             sel_item = self.items_list_box.get(a.widget.curselection())
             dates = []
-            data = ''
+            data = []
             try:
                 data = self.controller.search_item(sel_item)
                 d_data = str(data[0].expiry)
@@ -339,7 +339,6 @@ class View(Tk):
             else:
                 self.units_entry['values'] = 'count'
             self.set_values(data[0])
-        # self.update()
 
     # -- select items from fridge to cook with--
     def chosen_item_str(self, b: Event) -> None:
@@ -381,7 +380,7 @@ class View(Tk):
         if d.widget.curselection() not in [(), '']:
             recipe_name = self.recipe_list_box.get(d.widget.curselection())
             try:
-                recipe = ''
+                recipe = []
                 if self.recipes_from_chosen_products:
                     for i in self.recipes_from_chosen_products:
                         if recipe_name == i.title:
@@ -405,7 +404,8 @@ class View(Tk):
 
                         if self.controller.chosen_recipe.instructions:
                             result = self.controller.remove_li(self.controller.chosen_recipe.instructions)
-                            self.recipe_description_text.insert(1.0, result)
+                            new_result = self.controller.prepare_text_for_display(result, 80)
+                            self.recipe_description_text.insert(1.0, new_result)
                         else:
                             self.recipe_description_text.insert(1.0, 'Sorry! No information available')
                     except AttributeError:
@@ -609,6 +609,54 @@ class View(Tk):
         self.send_btn_box.grid(column=0, columnspan=2, row=2, sticky='n', padx=(0, 2))
         return shopping_list_frame
 
+    # -- name of users' fields --
+    def name_buttons(self) -> list:
+        """
+        only
+        :returns list with names of all users' fields used for proper user manipulation
+        """
+        return [
+            [self.first_user_label, self.first_user_entry, self.first_user_mail,
+             self.first_user_mail_entry, self.update_first_user, self.delete_first_user, ],
+            [self.sec_user_label, self.sec_user_entry, self.sec_user_mail,
+             self.sec_user_mail_entry, self.update_sec_user, self.delete_sec_user, ],
+            [self.third_user_label, self.third_user_entry, self.third_user_mail,
+             self.third_user_mail_entry, self.update_third_user, self.delete_third_user, ],
+            [self.four_user_label, self.four_user_entry, self.four_user_mail,
+             self.four_user_mail_entry, self.update_four_user, self.delete_four_user, ],
+            [self.fifth_user_label, self.fifth_user_entry, self.fifth_user_mail,
+             self.fifth_user_mail_entry, self.update_fifth_user, self.delete_fifth_user, ],
+            [self.sixth_user_label, self.sixth_user_entry, self.sixth_user_mail,
+             self.sixth_user_mail_entry, self.update_sixth_user, self.delete_sixth_user, ],
+            [self.sev_user_label, self.sev_user_entry, self.sev_user_mail,
+             self.sev_user_mail_entry, self.update_sev_user, self.delete_sev_user, ],
+        ]
+
+    # -- make keyboard in the view --
+    def make_letter_buttons(self, parent: Frame) -> None:
+        """
+        make keyboard buttons in specific frame and every button returns letter of calls function
+        :param parent: Frame where the keyboard to be displayed in
+        """
+        inner_counter = 0
+        for i in string.ascii_lowercase:
+            Button(parent, text=i, command=lambda ltr=i: self.controller.handle_letter(ltr), width=3,
+                   background='#EBF5FB', foreground='#212F3D', font=('Helvetica', 12, 'bold')) \
+                .grid(column=(inner_counter % 10), row=inner_counter // 10, sticky='news', padx=2, pady=2)
+            inner_counter += 1
+        Button(parent, text='DELETE', command=lambda ltr='del': self.controller.handle_letter(ltr),
+               background='#F9EBEA', foreground='#212F3D', font=('Helvetica', 12, 'bold')) \
+            .grid(column=inner_counter % 10, row=inner_counter // 10, sticky='news', padx=2, pady=2,
+                  columnspan=10 - ((inner_counter - 1) % 10))
+        inner_counter += 1
+        Button(parent, text='SPACE', command=lambda ltr='space': self.controller.handle_letter(ltr),
+               background='#FEF9E7', foreground='#212F3D', font=('Helvetica', 12, 'bold')) \
+            .grid(column=0, row=(inner_counter // 10) + 1, columnspan=10, sticky='news', padx=2, pady=2)
+        inner_counter += 1
+        Button(parent, text='ENTER', command=lambda ltr='enter': self.controller.handle_letter(ltr),
+               background='#E9F7EF', foreground='#212F3D', font=('Helvetica', 12, 'bold')) \
+            .grid(column=0, row=(inner_counter // 10) + 2, columnspan=10, sticky='news', padx=2, pady=2, ipady=12)
+
     # -- make cook frame window --
     def make_cook_window(self, parent: Frame) -> Frame:
         """
@@ -701,7 +749,7 @@ class View(Tk):
         self.quantity_entry = ttk.Spinbox(q_box, from_=1, to=10000, increment=1, textvariable=self.quantity_val,
                                           width=17, font=self.FONT3, state='disabled')
         self.quantity_entry.grid(column=0, row=0, sticky='w', padx=(0, 1))
-        self.units_entry = ttk.Combobox(q_box, textvariable=self.unit_var, width=6, font=self.FONT3)
+        self.units_entry = ttk.Combobox(q_box, textvariable=self.unit_var, width=6, font=self.FONT3, state='readonly')
         self.units_entry['values'] = ('count', 'ml', 'l', 'g', 'kg')
         self.units_entry.grid(column=1, row=0, sticky='e', padx=(2, 0))
         self.units_entry.bind("<<ComboboxSelected>>", self.controller.change_spinbox)
@@ -722,7 +770,7 @@ class View(Tk):
         self.keyboard_box = Frame(details_box)
         self.keyboard_box.grid(column=0, columnspan=4, row=5, sticky='n')
         self.alpha_box = Frame(self.keyboard_box)
-        self.controller.make_letter_buttons(self.alpha_box)
+        self.make_letter_buttons(self.alpha_box)
         self.alpha_box.grid(column=0, row=0, sticky='s', pady=(32, 0))
         return add_item_frame
 
