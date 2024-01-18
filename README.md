@@ -21,13 +21,21 @@ Installation
 	
 
 1.	Main goals of the project
+   
   1.1.	Add, remove, update, delete products in the fridge
+  
   1.2.	Get recipes – by chosen products, random recipes from the API or from saved recipes in favorites
+  
   1.3.	Choose from displayed recipes and if not interested get new recipes
+  
   1.4.	If recipe is chosen to generate shopping list with products that are not in the fridge
+  
   1.5.	The shopping list is displayed as text and as QR code with the shopping list as text, there is an option to send the shopping list to fridge’s users by email or to not registered person with email(where email have to be written)
+  
   1.6.	There is an option that recipe to be displayed on the screen
+  
 2.	User requests
+   
   •	To set name of the Smart Fridge
 
   •	To set users with usernames and emails connected to the Smart Fridge
