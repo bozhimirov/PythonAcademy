@@ -4,10 +4,6 @@ from sqlalchemy import ForeignKey, String
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
-# # create an in-memory SQLite database
-# engine = create_engine('sqlite:///mydatabase.db')
-# # engine_in_memory = create_engine('sqlite:///:memory:', echo=True)
-
 
 class Base(DeclarativeBase):
     """
@@ -31,7 +27,7 @@ class User(Base):
     mail: Mapped[str] = mapped_column(String(50))
 
     fridge_id: Mapped[int] = mapped_column(ForeignKey('fridge.id'))
-    fridge: Mapped['Fridge'] = relationship(back_populates='fridge_users')
+    fridges: Mapped[List['Fridge']] = relationship(back_populates='fridge_users')
 
     def __repr__(self) -> str:
         """
@@ -60,7 +56,7 @@ class Fridge(Base):
     )
 
     fridge_users: Mapped[List['User']] = relationship(
-        back_populates='fridge', cascade='all, delete-orphan'
+        back_populates='fridges', cascade='all, delete-orphan'
     )
 
     def __repr__(self) -> str:
@@ -69,33 +65,6 @@ class Fridge(Base):
             :returns fridge's name
         """
         return f'name={self.name!r}'
-
-
-class Ingredient(Base):
-    """
-    An Ingredient class that is made by ingredients needed for making a recipe
-    params: id: int id of the ingredient autoincrement and primary key
-    params: name: str name of the ingredient
-    params: amount: str amount of the ingredient as a string
-    params: unit: str unit of the ingredient
-    params: recipe_id: int id of the ingredient as it is in the API
-    """
-    __tablename__ = 'ingredient'
-
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    name: Mapped[str] = mapped_column(String(30))
-    amount: Mapped[str] = mapped_column(String(10))
-    unit: Mapped[str] = mapped_column(String(20))
-    recipe_id: Mapped[int] = mapped_column(ForeignKey('recipe.id'))
-    recipe: Mapped['Recipe'] = relationship(back_populates='ingredients')
-
-    def __repr__(self) -> str:
-        """
-            Representation of ingredient
-            :returns ingredient's name
-        """
-        return f'{self.name}'
-
 
 class SubCategory(Base):
     """
@@ -134,11 +103,14 @@ class Item(Base):
     name: Mapped[str] = mapped_column(String(30))
     amount: Mapped[str] = mapped_column(String(10))
     unit: Mapped[str] = mapped_column(String(20))
-    expiry: Mapped[str] = mapped_column(String)
-    sub_category_id: Mapped[int] = mapped_column(ForeignKey('sub_category.id'))
+    expiry: Mapped[str] = mapped_column(String, nullable=True)
+    sub_category_id: Mapped[int] = mapped_column(ForeignKey('sub_category.id'), nullable=True)
     sub_category: Mapped['SubCategory'] = relationship(back_populates='items')
-    fridge_id: Mapped[int] = mapped_column(ForeignKey('fridge.id'))
+    fridge_id: Mapped[int] = mapped_column(ForeignKey('fridge.id'), nullable=True)
     fridge: Mapped['Fridge'] = relationship(back_populates='content')
+    recipe_id: Mapped[int] = mapped_column(ForeignKey('recipe.id'), nullable=True)
+    recipe: Mapped['Recipe'] = relationship(back_populates='ingredients')
+
 
     def __repr__(self) -> str:
         """
@@ -165,7 +137,7 @@ class Recipe(Base):
     title: Mapped[str] = mapped_column(String(30))
     image: Mapped[str] = mapped_column(String(60))
     instructions: Mapped[str] = mapped_column(String(600))
-    ingredients: Mapped[List['Ingredient']] = relationship(back_populates='recipe', cascade="all,delete",)
+    ingredients: Mapped[List['Item']] = relationship(back_populates='recipe', cascade="all,delete",)
 
     fridge_id: Mapped[int] = mapped_column(ForeignKey('fridge.id'))
     fridge: Mapped['Fridge'] = relationship(back_populates='favourite_recipes')

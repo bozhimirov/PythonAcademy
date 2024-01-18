@@ -16,7 +16,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from db import DataBase
 from view import View
-from model import Item, Ingredient, Recipe, Base, Fridge, User, SubCategory
+from model import Item, Recipe, Base, Fridge, User, SubCategory
 
 
 class Controller:
@@ -105,7 +105,7 @@ class Controller:
         :returns string with instructions without html tags
         """
         if instructions:
-            i = instructions.replace('<ol>', '').replace('<li>', '').replace('<p>', '').replace('</p>', '\n')\
+            i = instructions.replace('<ol>', '').replace('<li>', '').replace('<p>', '').replace('</p>', '\n') \
                 .replace('</p>', '\n').replace('</li>', '\n').replace('</ol>', '\n')
             return i
         else:
@@ -537,7 +537,7 @@ class Controller:
                     ingr_name = i['name']
                     if i['nameClean']:
                         ingr_name = self.check_name_len(i['name'], i['nameClean'])
-                    ingredient = Ingredient(
+                    ingredient = Item(
                         name=ingr_name, amount=amount, unit=unit)
                     for j in self.ingredients_not_to_buy:
                         if ingredient.name not in j or j not in ingredient.name:
@@ -626,7 +626,7 @@ class Controller:
         for i in r_ingredients:
             amount, unit = self.make_unit(i['measures']['metric']['amount'], i['measures']['metric']['unitShort'])
             ingr_name = self.check_name_len(i['name'], i['nameClean'])
-            ingredient = Ingredient(
+            ingredient = Item(
                 name=ingr_name, amount=amount, unit=unit)
             for j in self.ingredients_not_to_buy:
                 if ingredient.name not in j or j not in ingredient.name:
@@ -635,7 +635,7 @@ class Controller:
         return recipe
 
     # -- check if ingredient is among list of ingredients not to buy --
-    def check_ingredients_not_to_buy(self, ingredient: Ingredient) -> Ingredient:
+    def check_ingredients_not_to_buy(self, ingredient: Item) -> Item:
         """
         check if specific ingredient has to be bought
         :param ingredient: Ingredient object that has to be checked if it has to be bought
@@ -940,7 +940,7 @@ class Controller:
                 self.session.commit()
 
     # -- check if ingredient is in fridge and can be used --
-    def check_if_ingredient_is_in_fridge(self, ingredient: Ingredient) -> Ingredient:
+    def check_if_ingredient_is_in_fridge(self, ingredient: Item) -> Item:
         """
         check if ingredient is in fridge, if in fridge and amount is enough for the recipe, the food item in fridge is
         updated with removed amount needed for the recipe, else ingredient is not removed from shopping list
@@ -948,8 +948,8 @@ class Controller:
         :return Ingredient
         """
         return_product = True
-        ingredient_to_manipulate = Ingredient(name=ingredient.name, amount=ingredient.amount, unit=ingredient.unit,
-                                              recipe_id=ingredient.recipe_id)
+        ingredient_to_manipulate = Item(name=ingredient.name, amount=ingredient.amount, unit=ingredient.unit,
+                                        recipe_id=ingredient.recipe_id)
         for item in self.fridge.content:
             if ingredient_to_manipulate.amount == 0:
                 return_product = False
@@ -977,7 +977,7 @@ class Controller:
             return ingredient_to_manipulate
 
     # -- check if ingredient is in shopping variable --
-    def check_if_ingredient_is_shopping_list(self, ingredient: Ingredient) -> Ingredient:
+    def check_if_ingredient_is_shopping_list(self, ingredient: Item) -> Item:
         """
         check if ingredient is in shopping list by checking substrings of any name to eliminate duplications
         :param ingredient: Ingredient to be checked if is in the shopping variable
@@ -1006,6 +1006,7 @@ class Controller:
         try:
             if action == 'clear':
                 self.clear_fields()
+                self.view.enable_buttons()
             elif action == 'add':
                 name_item, quantity, unit, expiry_date, sub_category = self.view.get_values()
                 if name_item and unit and quantity:
@@ -1022,9 +1023,11 @@ class Controller:
                                                             n_unit,
                                                             n_expiry_date, sub_category)
                 self.clear_fields()
+                self.view.enable_buttons()
             elif action == 'delete':
                 self.db.delete_item_from_fridge(self.session, self.last_item[0])
                 self.clear_fields()
+                self.view.enable_buttons()
             elif action == 'update':
                 name_item, quantity, unit, expiry_date, sub_category = self.view.get_values()
                 old_name = self.last_item[0].name
@@ -1041,6 +1044,7 @@ class Controller:
                                     fridge_id=self.fridge.id)
                         self.db.add_item_to_fridge(self.session, item)
                 self.clear_fields()
+                self.view.enable_buttons()
             elif action == 'remove':
                 _, quantity, unit, _, _ = self.view.get_values()
                 old_name = self.last_item[0].name
@@ -1058,6 +1062,7 @@ class Controller:
                 else:
                     self.db.delete_item_from_fridge(self.session, self.last_item[0])
                 self.clear_fields()
+                self.view.enable_buttons()
         except AttributeError:
             pass
 
@@ -1087,6 +1092,7 @@ class Controller:
             self.generate_choices()
             sub_cat = action
             self.view.raise_above_all(actions[action], sub_cat)
+            self.view.enable_buttons()
         except KeyError:
             pass
 
