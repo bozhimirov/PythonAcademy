@@ -29,19 +29,33 @@ Installation
   1.6.	There is an option that recipe to be displayed on the screen
 2.	User requests
   •	To set name of the Smart Fridge
+
   •	To set users with usernames and emails connected to the Smart Fridge
+  
   •	Fridge’s name have an option to be changed
+  
   •	Users can be added, updated, removed from the Smart Fridge
+  
   •	Users can add products by categories in the Smart Fridge
+  
   •	Users can change and delete products from the Smart Fridge
+  
   •	If there is an expired product there is a prompt to delete the product from the Smart Fridge and to remove it from the Smart Fridge
+  
   •	If all of the amount of a given product is used for the selected recipe, the product to be automatically removed from the Smart Fridge
+  
   •	Users have 3 options to choose a recipe – from chosen products, from save recipes in favorites, from randomly generated recipes
+  
   •	When name of a recipe is selected user can see the ingredients needed, the instructions for preparing the meal and the image of the meal (if provided)
+  
   •	When user want to cook a recipe a shopping list is generated and displayed
+  
   •	User can write the shopping list on a list of paper, or get it in its phone by QR code, there is an option the shopping list to be send by mail to registered users or to other user not registered in the Smart Fridge again with QR code
+  
   •	If the user want to cook another meal it can return to the previous page and choose another recipe and add it to the shopping list
+  
   •	Products from the shopping list can be removed (not all products are in the fridge, some of them may be in the garden and waiting to be collected) and QR code is updated  
+  
   •	User can display all products and recipe instructions and start cooking.
 
 
